@@ -1,11 +1,10 @@
-<script setup>
-
-</script>
+<script setup></script>
 
 <template>
-  <main>
-    <h1>TEST</h1>
-  </main>
+  <header>
+    <h1>Главная страница</h1>
+  </header>
+  <main></main>
 </template>
 
 <style scoped>
@@ -14,5 +13,4 @@
   padding: 0;
   box-sizing: border-box;
 }
-
 </style>

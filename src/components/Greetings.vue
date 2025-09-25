@@ -18,11 +18,6 @@ const goToMainPage = () => {
 </template>
 
 <style scoped>
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
 main {
   display: flex;
   flex-direction: column;
@@ -33,16 +28,18 @@ main {
   -moz-osx-font-smoothing: grayscale;
   text-align: center;
   color: #2c3e50;
-  background-image: url("@/assets/mainBackground.png");
+  background-image: url('@/assets/mainBackground.png');
   background-repeat: no-repeat;
   background-size: cover;
+  background-position: center;
   height: 100vh;
+  width: 100vw;
 }
 
 .greetings {
   font-weight: bold;
-  font-size: 75px;
-  color: #1C1C1C;
+  font-size: clamp(2rem, 8vw, 5rem);
+  color: #1c1c1c;
 }
 
 .container {
@@ -50,23 +47,45 @@ main {
   align-items: center;
   justify-content: center;
   background-color: #fff;
-  width: 100%;
-  height: 100px;
-  margin-bottom: 14px;
+  width: 95%;
+  height: clamp(50px, 10vh, 100px);
+  margin-bottom: 1rem;
   border-radius: 25px;
 }
 
 .start-button {
-  width: 706px;
-  height: 108px;
-  background: #D9D9D9;
+  width: clamp(200px, 80%, 706px);
+  height: clamp(50px, 10vh, 108px);
+  background: #d9d9d9;
   border-radius: 25px;
   border: none;
-  color: #1C1C1C;
-  font-size: 75px;
+  color: #1c1c1c;
+  font-size: clamp(1.5rem, 6vw, 4rem);
   font-weight: bold;
   cursor: pointer;
-  padding: 9px 216px;
-  margin-bottom: 41px;
+  padding: 0.5rem 1rem;
+  margin-bottom: 2rem;
+}
+
+@media (max-width: 768px) {
+  .container {
+    width: 95%;
+    margin-bottom: 0.5rem;
+  }
+  .start-button {
+    margin-bottom: 1rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .greetings {
+    font-size: 5rem;
+  }
+  .start-button {
+    width: 706px;
+    height: 108px;
+    padding: 9px 216px;
+    margin-bottom: 41px;
+  }
 }
 </style>
