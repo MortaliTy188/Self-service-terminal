@@ -15,6 +15,6 @@ export default defineConfig({
   server: {
     host: '127.0.0.1',
     port: 3000,
-    allowedHosts: ['3ifu8jgiod68.share.zrok.io'],
+    allowedHosts: ['ypgb66zjkf0a.share.zrok.io'],
   },
 })
