@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import AppHeader from '../components/AppHeader.vue'
 import CategoryList from '../components/CategoryList.vue'
 import FoodGrid from '../components/FoodGrid.vue'
@@ -13,93 +13,31 @@ import SuccessNotification from '../components/SuccessNotification.vue'
 
 const cartItems = ref([])
 const lastOrder = ref(null)
-const selectedCategory = ref('Все категории')
+const selectedCategory = ref(null) // null означает "Все категории"
 const showWaiterPopup = ref(false)
 const showOrderPopup = ref(false)
 const showOrderDetailsPopup = ref(false)
 const showFoodDetailPopup = ref(false)
 const showSuccessNotification = ref(false)
 const selectedFoodItem = ref(null)
-const categories = ref([
-  'Все категории',
-  'Суши',
-  'Пицца',
-  'Вок',
-  'Десерты',
-  'Напитки',
-  'Закуски',
-  'Пример1',
-  'Пример2',
-  'Пример3',
-])
-const categoryItems = ref([
-  {
-    category: 'Суши',
-    items: [
-      { title: 'Суши с лососем', price: 600 },
-      { title: 'Суши с тунцом', price: 650 },
-      { title: 'Филадельфия', price: 700 },
-      { title: 'Калифорния', price: 650 },
-    ],
-  },
-  {
-    category: 'Пицца',
-    items: [
-      { title: 'Пепперони', price: 700 },
-      { title: 'Маргарита', price: 650 },
-      { title: 'Четыре сыра', price: 750 },
-      { title: 'Гавайская', price: 700 },
-    ],
-  },
-  {
-    category: 'Вок',
-    items: [
-      { title: 'Вок с курицей', price: 500 },
-      { title: 'Вок с говядиной', price: 550 },
-      { title: 'Вок с морепродуктами', price: 600 },
-      { title: 'Вок с овощами', price: 450 },
-    ],
-  },
-  {
-    category: 'Десерты',
-    items: [
-      { title: 'Тирамису', price: 300 },
-      { title: 'Чизкейк', price: 350 },
-      { title: 'Мороженое', price: 200 },
-      { title: 'Шоколадный торт', price: 400 },
-    ],
-  },
-  {
-    category: 'Напитки',
-    items: [
-      { title: 'Кока-кола', price: 150 },
-      { title: 'Сок апельсиновый', price: 180 },
-      { title: 'Чай зеленый', price: 120 },
-      { title: 'Кофе американо', price: 200 },
-    ],
-  },
-])
 
-const filteredItems = computed(() => {
-  if (selectedCategory.value === 'Все категории') {
-    return categoryItems.value.flatMap((category) => category.items)
-  } else {
-    const category = categoryItems.value.find((cat) => cat.category === selectedCategory.value)
-    return category ? category.items : []
-  }
-})
-
-const selectCategory = (category) => {
-  selectedCategory.value = category
+const selectCategory = (categoryId) => {
+  selectedCategory.value = categoryId
 }
 
 const addToCart = (itemData) => {
-  const existingItem = cartItems.value.find((cartItem) => cartItem.title === itemData.title)
+  const existingItem = cartItems.value.find(
+    (cartItem) => cartItem.id === itemData.id || cartItem.title === itemData.title,
+  )
 
   if (existingItem) {
     existingItem.quantity += itemData.quantity || 1
   } else {
-    cartItems.value.push({ ...itemData, quantity: itemData.quantity || 1 })
+    cartItems.value.push({
+      ...itemData,
+      quantity: itemData.quantity || 1,
+      title: itemData.name || itemData.title, // для совместимости с существующими компонентами
+    })
   }
 }
 
@@ -114,7 +52,7 @@ const closeFoodDetailPopup = () => {
 }
 
 const addQuantity = (item) => {
-  const cartItem = cartItems.value.find((i) => i.title === item.title)
+  const cartItem = cartItems.value.find((i) => i.id === item.id || i.title === item.title)
   if (cartItem) {
     cartItem.quantity++
   }
@@ -182,12 +120,8 @@ const confirmOrder = () => {
     <div class="main-container">
       <div class="main-container-left">
         <div class="main-container-left-top">
-          <CategoryList
-            :categories="categories"
-            :selected-category="selectedCategory"
-            @select-category="selectCategory"
-          />
-          <FoodGrid :items="filteredItems" @show-detail="showFoodDetail" />
+          <CategoryList :selected-category="selectedCategory" @select-category="selectCategory" />
+          <FoodGrid :selected-category="selectedCategory" @show-detail="showFoodDetail" />
         </div>
         <BottomControls @call-waiter="callWaiter" @show-order-details="showOrderDetails" />
       </div>

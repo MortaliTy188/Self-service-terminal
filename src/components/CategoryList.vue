@@ -1,30 +1,46 @@
 <template>
   <div class="categoriesContainer">
-    <div v-for="(category, index) in categories" :key="index" class="category">
-      <button
-        class="button"
-        :class="{ active: selectedCategory === category }"
-        @click="$emit('selectCategory', category)"
-      >
-        {{ category }}
-      </button>
+    <div v-if="isLoading" class="loading">Загрузка категорий...</div>
+    <div v-else-if="error" class="error">Ошибка: {{ error }}</div>
+    <div v-else>
+      <!-- Добавляем кнопку "Все категории" -->
+      <div class="category">
+        <button
+          class="button"
+          :class="{ active: selectedCategory === null }"
+          @click="$emit('selectCategory', null)"
+        >
+          Все категории
+        </button>
+      </div>
+      <!-- Отображаем категории с сервера -->
+      <div v-for="category in categories" :key="category.id" class="category">
+        <button
+          class="button"
+          :class="{ active: selectedCategory === category.id }"
+          @click="$emit('selectCategory', category.id)"
+        >
+          {{ category.name }}
+        </button>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-defineProps({
-  categories: {
-    type: Array,
-    required: true,
-  },
+import { useCategories } from '../hooks'
+
+const props = defineProps({
   selectedCategory: {
     type: String,
-    default: 'Все категории',
+    default: null,
   },
 })
 
 defineEmits(['selectCategory'])
+
+// Используем хук для получения категорий
+const { categories, isLoading, error } = useCategories()
 </script>
 
 <style scoped>
@@ -44,6 +60,21 @@ defineEmits(['selectCategory'])
   border: 1px solid #333;
 }
 
+.loading,
+.error {
+  padding: 20px;
+  text-align: center;
+  font-size: 16px;
+  color: #666;
+}
+
+.error {
+  color: #d32f2f;
+  background: #ffebee;
+  border-radius: 8px;
+  border: 1px solid #ffcdd2;
+}
+
 .button {
   background: white;
   font-size: 22px;
@@ -54,6 +85,7 @@ defineEmits(['selectCategory'])
   border: 2px solid #f0f0f0;
   width: 100%;
   max-width: 250px;
+  min-width: 207px;
   height: 70px;
   cursor: pointer;
   flex-shrink: 0;

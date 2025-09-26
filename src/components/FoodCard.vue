@@ -1,7 +1,7 @@
 <template>
   <div class="food-card" @click="$emit('show-detail', item)">
     <img :src="item.image || '/src/assets/image 28.png'" alt="food" />
-    <p class="food-card__title">{{ item.title }}</p>
+    <p class="food-card__title">{{ item.name || item.title }}</p>
     <p class="food-card__price">Цена: {{ item.price }}₽</p>
   </div>
 </template>
