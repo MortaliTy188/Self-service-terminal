@@ -37,6 +37,39 @@ export function useCategories() {
     return category ? category.name : 'Неизвестная категория'
   }
 
+  const createCategory = async (categoryData) => {
+    try {
+      console.log('Создание категории:', categoryData)
+
+      // Реальный API вызов (пока закомментирован)
+      // const response = await fetch(`${BASE_URL}/categories`, {
+      //   method: 'POST',
+      //   headers: {
+      //     'Content-Type': 'application/json',
+      //   },
+      //   body: JSON.stringify(categoryData)
+      // })
+
+      // if (!response.ok) {
+      //   throw new Error(`HTTP error! status: ${response.status}`)
+      // }
+
+      // const newCategory = await response.json()
+
+      // Временно создаем категорию локально
+      const newCategory = {
+        id: Date.now(),
+        name: categoryData.name,
+      }
+
+      categories.value.push(newCategory)
+      return newCategory
+    } catch (err) {
+      console.error('Error creating category:', err)
+      throw err
+    }
+  }
+
   onMounted(() => {
     fetchCategories()
   })
@@ -48,5 +81,6 @@ export function useCategories() {
     fetchCategories,
     getCategoryById,
     getCategoryName,
+    createCategory,
   }
 }

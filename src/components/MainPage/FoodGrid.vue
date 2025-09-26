@@ -16,7 +16,7 @@
 <script setup>
 import { computed } from 'vue'
 import FoodCard from './FoodCard.vue'
-import { useMenu } from '../hooks'
+import { useMenu } from '@/hooks'
 
 const props = defineProps({
   selectedCategory: {

@@ -1,5 +1,6 @@
 <script setup>
 import { ref } from 'vue'
+import placeholderImage from '@/assets/image 28.png'
 
 const props = defineProps({
   show: {
@@ -37,6 +38,10 @@ const addToCart = () => {
     closePopup()
   }
 }
+
+const handleImageError = (event) => {
+  event.target.src = placeholderImage
+}
 </script>
 
 <template>
@@ -45,9 +50,10 @@ const addToCart = () => {
       <div class="popup-header">
         <div class="header-left">
           <img
-            :src="item.image || '/src/assets/image 28.png'"
+            :src="item.image || placeholderImage"
             :alt="item.title"
             class="food-image"
+            @error="handleImageError"
           />
         </div>
         <div class="header-right">

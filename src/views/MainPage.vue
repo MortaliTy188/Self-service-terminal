@@ -1,15 +1,25 @@
 <script setup>
 import { ref } from 'vue'
-import AppHeader from '../components/AppHeader.vue'
-import CategoryList from '../components/CategoryList.vue'
-import FoodGrid from '../components/FoodGrid.vue'
-import ShoppingCart from '../components/ShoppingCart.vue'
-import BottomControls from '../components/BottomControls.vue'
-import WaiterPopup from '../components/WaiterPopup.vue'
-import OrderPopup from '../components/OrderPopup.vue'
-import FoodDetailPopup from '../components/FoodDetailPopup.vue'
-import OrderDetailsPopup from '../components/OrderDetailsPopup.vue'
-import SuccessNotification from '../components/SuccessNotification.vue'
+import AppHeader from '@/components/AppHeader.vue'
+import { useWaiterNotifications } from '@/hooks'
+import {
+  CategoryList,
+  FoodGrid,
+  ShoppingCart,
+  BottomControls,
+  WaiterPopup,
+  OrderPopup,
+  FoodDetailPopup,
+  OrderDetailsPopup,
+  SuccessNotification,
+} from '@/components/MainPage'
+
+// Хук для работы с уведомлениями официанта
+const {
+  callWaiter: callWaiterAPI,
+  isLoading: isWaiterLoading,
+  simulateNewNotification,
+} = useWaiterNotifications()
 
 const cartItems = ref([])
 const lastOrder = ref(null)
@@ -71,8 +81,26 @@ const removeFromCart = (index) => {
   cartItems.value.splice(index, 1)
 }
 
-const callWaiter = () => {
+const callWaiter = async () => {
   showWaiterPopup.value = true
+
+  // Получаем номер стола (в реальном приложении он может быть в контексте/store)
+  const tableNumber = 5 // Заглушка - номер стола
+
+  try {
+    // Вызываем функцию из хука для отправки запроса на сервер
+    const result = await callWaiterAPI(tableNumber)
+
+    if (result.success) {
+      // Для демонстрации создаем уведомление на странице OrdersPage
+      // В реальном приложении это будет приходить через WebSocket
+      simulateNewNotification(tableNumber)
+
+      console.log('Официант успешно вызван')
+    }
+  } catch (error) {
+    console.error('Ошибка при вызове официанта:', error)
+  }
 }
 
 const closeWaiterPopup = () => {
@@ -135,7 +163,7 @@ const confirmOrder = () => {
     </div>
   </main>
 
-  <WaiterPopup :show="showWaiterPopup" @close="closeWaiterPopup" />
+  <WaiterPopup :show="showWaiterPopup" :is-loading="isWaiterLoading" @close="closeWaiterPopup" />
 
   <OrderPopup
     :show="showOrderPopup"

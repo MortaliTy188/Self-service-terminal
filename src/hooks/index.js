@@ -1,4 +1,6 @@
 export { useMenu } from './useMenu.js'
 export { useCategories } from './useCategories.js'
 export { useMenuWithCategories } from './useMenuWithCategories.js'
+export { useOrders } from './useOrders.js'
+export { useWaiterNotifications } from './useWaiterNotifications.js'
 export { apiClient, BASE_URL } from './api.js'

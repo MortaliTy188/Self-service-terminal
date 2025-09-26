@@ -28,7 +28,7 @@
 </template>
 
 <script setup>
-import { useCategories } from '../hooks'
+import { useCategories } from '@/hooks'
 
 const props = defineProps({
   selectedCategory: {

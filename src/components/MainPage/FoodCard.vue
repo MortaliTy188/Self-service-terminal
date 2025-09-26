@@ -1,12 +1,18 @@
 <template>
   <div class="food-card" @click="$emit('show-detail', item)">
-    <img :src="item.image || '/src/assets/image 28.png'" alt="food" />
+    <img
+      :src="item.image || placeholderImage"
+      :alt="item.name || item.title"
+      @error="handleImageError"
+    />
     <p class="food-card__title">{{ item.name || item.title }}</p>
     <p class="food-card__price">Цена: {{ item.price }}₽</p>
   </div>
 </template>
 
 <script setup>
+import placeholderImage from '@/assets/image 28.png'
+
 defineProps({
   item: {
     type: Object,
@@ -15,6 +21,10 @@ defineProps({
 })
 
 defineEmits(['show-detail'])
+
+const handleImageError = (event) => {
+  event.target.src = placeholderImage
+}
 </script>
 
 <style scoped>

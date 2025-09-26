@@ -1,0 +1,6 @@
+export { default as LeftSidebar } from './LeftSidebar.vue'
+export { default as OrderFilters } from './OrderFilters.vue'
+export { default as OrdersTable } from './OrdersTable.vue'
+export { default as WaiterNotificationPopup } from './WaiterNotificationPopup.vue'
+export { default as MenuManagement } from './MenuManagement.vue'
+export { default as EditItemPopup } from './EditItemPopup.vue'

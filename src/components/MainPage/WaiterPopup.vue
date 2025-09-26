@@ -4,6 +4,10 @@ defineProps({
     type: Boolean,
     default: false,
   },
+  isLoading: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 const emit = defineEmits(['close'])
@@ -17,9 +21,16 @@ const closePopup = () => {
   <div v-if="show" class="popup-overlay" @click="closePopup">
     <div class="popup-container" @click.stop>
       <div class="popup-content">
-        <h2>Официант скоро подойдет.</h2>
-        <p>Пожалуйста, ожидайте.</p>
-        <button class="close-button" @click="closePopup">OK</button>
+        <div v-if="isLoading" class="loading-content">
+          <div class="spinner"></div>
+          <h2>Вызываем официанта...</h2>
+          <p>Пожалуйста, подождите</p>
+        </div>
+        <div v-else class="success-content">
+          <h2>Официант скоро подойдет.</h2>
+          <p>Пожалуйста, ожидайте.</p>
+          <button class="close-button" @click="closePopup">OK</button>
+        </div>
       </div>
     </div>
   </div>
@@ -82,6 +93,30 @@ const closePopup = () => {
 
 .close-button:hover {
   background-color: #45a049;
+}
+
+.loading-content,
+.success-content {
+  text-align: center;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  margin: 0 auto 20px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #ff6b35;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 @media (max-width: 768px) {
