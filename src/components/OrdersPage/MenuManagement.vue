@@ -250,9 +250,13 @@ const createNewCategory = async () => {
     newCategoryName.value = ''
 
     console.log('Категория успешно создана:', newCategory)
+
+    // Показываем уведомление об успехе
+    alert(`Категория "${newCategory.name}" успешно создана и добавлена в фильтры!`)
   } catch (error) {
     console.error('Ошибка при создании категории:', error)
-    // Здесь можно показать уведомление об ошибке
+    // Показываем уведомление об ошибке
+    alert(`Ошибка: ${error.message}`)
   }
 }
 

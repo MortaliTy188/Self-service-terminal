@@ -1,7 +1,9 @@
 <script setup>
 import { useRouter } from 'vue-router'
+import { useSplashSettings } from '@/hooks'
 
 const router = useRouter()
+const { backgroundStyle } = useSplashSettings()
 
 const goToMainPage = () => {
   router.push('/main')
@@ -9,7 +11,7 @@ const goToMainPage = () => {
 </script>
 
 <template>
-  <main>
+  <main :style="backgroundStyle">
     <div class="container">
       <h1 class="greetings">Добро пожаловать!</h1>
     </div>
@@ -28,10 +30,6 @@ main {
   -moz-osx-font-smoothing: grayscale;
   text-align: center;
   color: #2c3e50;
-  background-image: url('@/assets/mainBackground.png');
-  background-repeat: no-repeat;
-  background-size: cover;
-  background-position: center;
   height: 100vh;
   width: 100vw;
 }

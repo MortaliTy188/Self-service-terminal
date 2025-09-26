@@ -13,5 +13,6 @@ html,
 body {
   margin: 0;
   padding: 0;
+  overflow-y: hidden;
 }
 </style>

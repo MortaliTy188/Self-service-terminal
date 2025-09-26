@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { useAuth } from '@/hooks'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -17,8 +18,31 @@ const router = createRouter({
       path: '/orders',
       name: 'Orders',
       component: () => import('@/views/OrdersPage.vue'),
+      meta: { requiresAuth: true },
     },
   ],
+})
+
+// Глобальный навигационный гард для защищенных маршрутов
+router.beforeEach((to) => {
+  if (to.meta.requiresAuth) {
+    const { checkAdminAccess } = useAuth()
+
+    const authResult = checkAdminAccess()
+
+    if (!authResult.success) {
+      if (authResult.cancelled) {
+        // Пользователь отменил ввод ключа
+        return { name: 'Home' }
+      } else {
+        // Показываем ошибку и перенаправляем
+        alert(authResult.error || 'Доступ запрещен')
+        return { name: 'Home' }
+      }
+    }
+  }
+
+  return true
 })
 
 export default router

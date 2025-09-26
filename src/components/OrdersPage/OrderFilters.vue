@@ -110,7 +110,28 @@ const handleFilterChange = (filterValue) => {
   padding: 14px 16px;
   border-radius: 15px;
   margin-top: 5px;
-  flex-wrap: wrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.filter-container::-webkit-scrollbar {
+  height: 8px;
+}
+
+.filter-container::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+.filter-container::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 10px;
+}
+
+.filter-container::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
 }
 
 .control-button {
@@ -128,11 +149,13 @@ const handleFilterChange = (filterValue) => {
   color: #333;
   position: relative;
   gap: 8px;
+  flex-shrink: 0;
+  white-space: nowrap;
 
   /* Размер по умолчанию (medium) */
   max-width: 284px;
-  min-width: 250px;
-  padding: 23px 91px;
+  min-width: 200px;
+  padding: 23px 30px;
 }
 
 .control-button:disabled {

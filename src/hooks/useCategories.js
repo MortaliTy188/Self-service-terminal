@@ -2,11 +2,12 @@ import { ref, onMounted } from 'vue'
 
 const BASE_URL = 'http://83.222.9.90:8080'
 
-export function useCategories() {
-  const categories = ref([])
-  const isLoading = ref(false)
-  const error = ref(null)
+// Создаем глобальные реактивные состояния для синхронизации между компонентами
+const categories = ref([])
+const isLoading = ref(false)
+const error = ref(null)
 
+export function useCategories() {
   const fetchCategories = async () => {
     isLoading.value = true
     error.value = null
@@ -41,6 +42,15 @@ export function useCategories() {
     try {
       console.log('Создание категории:', categoryData)
 
+      // Проверяем, не существует ли уже категория с таким именем
+      const existingCategory = categories.value.find(
+        (cat) => cat.name.toLowerCase() === categoryData.name.toLowerCase(),
+      )
+
+      if (existingCategory) {
+        throw new Error('Категория с таким именем уже существует')
+      }
+
       // Реальный API вызов (пока закомментирован)
       // const response = await fetch(`${BASE_URL}/categories`, {
       //   method: 'POST',
@@ -63,6 +73,10 @@ export function useCategories() {
       }
 
       categories.value.push(newCategory)
+      console.log(
+        'Категория успешно добавлена. Общее количество категорий:',
+        categories.value.length,
+      )
       return newCategory
     } catch (err) {
       console.error('Error creating category:', err)

@@ -33,17 +33,18 @@
 
       <!-- Заглушки для других вкладок -->
       <template v-if="activeTab === 'devices'">
-        <div class="placeholder">
-          <h2>Устройства</h2>
-          <p>Функционал в разработке</p>
-        </div>
+        <DeviceManagement
+          :is-loading="false"
+          :error="null"
+          @retry="loadDeviceData"
+          @delete-device="handleDeleteDevice"
+          @open-settings="handleOpenDeviceSettings"
+          @update-connection-key="handleUpdateConnectionKey"
+        />
       </template>
 
       <template v-if="activeTab === 'settings'">
-        <div class="placeholder">
-          <h2>Настройки</h2>
-          <p>Функционал в разработке</p>
-        </div>
+        <SettingsManagement @save-settings="handleSaveSettings" />
       </template>
     </div>
   </div>
@@ -66,6 +67,8 @@ import {
   OrdersTable,
   WaiterNotificationPopup,
   MenuManagement,
+  DeviceManagement,
+  SettingsManagement,
 } from '@/components/OrdersPage'
 
 // Используем композицию для работы с заказами
@@ -330,6 +333,50 @@ watch(
   { deep: true },
 )
 
+// Функции для работы с устройствами
+const loadDeviceData = () => {
+  console.log('Загрузка данных устройств...')
+  // Здесь будет запрос на сервер для получения информации об устройствах
+}
+
+const handleDeleteDevice = (deviceId) => {
+  console.log('Удаление устройства:', deviceId)
+  // Здесь будет API вызов для удаления устройства
+  // В будущем: await deleteDevice(deviceId)
+}
+
+const handleOpenDeviceSettings = (deviceId) => {
+  console.log('Открытие настроек устройства:', deviceId)
+  // Здесь будет логика открытия настроек конкретного устройства
+}
+
+const handleUpdateConnectionKey = (deviceId, newKey) => {
+  console.log('Обновление ключа подключения устройства:', deviceId, newKey)
+  // Здесь будет API вызов для обновления ключа подключения
+  // В будущем: await updateDeviceConnectionKey(deviceId, newKey)
+}
+
+// Функции для работы с настройками
+const handleSaveSettings = (settingsData) => {
+  console.log('Сохранение настроек:', settingsData)
+  // Здесь будет API вызов для сохранения настроек системы
+  // В зависимости от типа настроек (account, api, splash)
+  switch (settingsData.type) {
+    case 'account':
+      console.log('Сохранение настроек аккаунта:', settingsData.data)
+      // await saveAccountSettings(settingsData.data)
+      break
+    case 'api':
+      console.log('Сохранение настроек API:', settingsData.data)
+      // await saveApiSettings(settingsData.data)
+      break
+    case 'splash':
+      console.log('Сохранение настроек заставки:', settingsData.data)
+      // await saveSplashSettings(settingsData.data)
+      break
+  }
+}
+
 // Инициализация при монтировании компонента
 onMounted(() => {
   // Загружаем базовые данные
@@ -363,6 +410,7 @@ onMounted(() => {
   flex: 1;
   display: flex;
   flex-direction: column;
+  max-width: 1400px;
 }
 
 .placeholder {
