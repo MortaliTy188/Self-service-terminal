@@ -38,7 +38,7 @@ const handleImageError = (event) => {
   cursor: pointer;
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   border-radius: 15px;
-  width: calc(25% - 11.25px);
+  width: calc(28% - 11.25px);
   min-width: 150px;
   flex-shrink: 0;
   align-self: flex-start;
@@ -46,6 +46,12 @@ const handleImageError = (event) => {
   border: 2px solid #f0f0f0;
   position: relative;
   overflow: hidden;
+}
+
+@media screen and (max-width: 1280px) {
+  .food-card {
+    width: calc(42% - 10px);
+  }
 }
 
 .food-card::before {
