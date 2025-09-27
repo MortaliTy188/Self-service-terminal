@@ -1,7 +1,7 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import AppHeader from '@/components/AppHeader.vue'
-import { useWaiterNotifications } from '@/hooks'
+import { useWaiterStore, useOrdersStore, useMenuStore } from '@/stores'
 import {
   CategoryList,
   FoodGrid,
@@ -14,15 +14,12 @@ import {
   SuccessNotification,
 } from '@/components/MainPage'
 
-// Хук для работы с уведомлениями официанта
-const {
-  callWaiter: callWaiterAPI,
-  isLoading: isWaiterLoading,
-  simulateNewNotification,
-} = useWaiterNotifications()
+// Pinia stores
+const waiterStore = useWaiterStore()
+const ordersStore = useOrdersStore()
+const menuStore = useMenuStore()
 
-const cartItems = ref([])
-const lastOrder = ref(null)
+// Local state
 const selectedCategory = ref(null) // null означает "Все категории"
 const showWaiterPopup = ref(false)
 const showOrderPopup = ref(false)
@@ -31,24 +28,23 @@ const showFoodDetailPopup = ref(false)
 const showSuccessNotification = ref(false)
 const selectedFoodItem = ref(null)
 
+// Computed values from stores
+const cartItems = computed(() => ordersStore.cartItems)
+const lastOrder = computed(() => ordersStore.lastOrder)
+const isWaiterLoading = computed(() => waiterStore.isLoading)
+
+// Event handlers
 const selectCategory = (categoryId) => {
   selectedCategory.value = categoryId
+  if (categoryId) {
+    menuStore.setCurrentCategory(categoryId)
+  } else {
+    menuStore.clearCategoryFilter()
+  }
 }
 
 const addToCart = (itemData) => {
-  const existingItem = cartItems.value.find(
-    (cartItem) => cartItem.id === itemData.id || cartItem.title === itemData.title,
-  )
-
-  if (existingItem) {
-    existingItem.quantity += itemData.quantity || 1
-  } else {
-    cartItems.value.push({
-      ...itemData,
-      quantity: itemData.quantity || 1,
-      title: itemData.name || itemData.title, // для совместимости с существующими компонентами
-    })
-  }
+  ordersStore.addToCart(itemData)
 }
 
 const showFoodDetail = (item) => {
@@ -62,45 +58,30 @@ const closeFoodDetailPopup = () => {
 }
 
 const addQuantity = (item) => {
-  const cartItem = cartItems.value.find((i) => i.id === item.id || i.title === item.title)
-  if (cartItem) {
-    cartItem.quantity++
-  }
+  ordersStore.addToCart(item, 1)
 }
 
 const removeQuantity = (index) => {
   const cartItem = cartItems.value[index]
-  if (cartItem && cartItem.quantity > 1) {
-    cartItem.quantity--
-  } else {
-    removeFromCart(index)
+  if (cartItem) {
+    ordersStore.updateCartItemQuantity(cartItem.id, cartItem.quantity - 1)
   }
 }
 
 const removeFromCart = (index) => {
-  cartItems.value.splice(index, 1)
+  const cartItem = cartItems.value[index]
+  if (cartItem) {
+    ordersStore.removeFromCart(cartItem.id)
+  }
 }
 
 const callWaiter = async () => {
   showWaiterPopup.value = true
+}
 
-  // Получаем номер стола (в реальном приложении он может быть в контексте/store)
-  const tableNumber = 5 // Заглушка - номер стола
-
-  try {
-    // Вызываем функцию из хука для отправки запроса на сервер
-    const result = await callWaiterAPI(tableNumber)
-
-    if (result.success) {
-      // Для демонстрации создаем уведомление на странице OrdersPage
-      // В реальном приложении это будет приходить через WebSocket
-      simulateNewNotification(tableNumber)
-
-      console.log('Официант успешно вызван')
-    }
-  } catch (error) {
-    console.error('Ошибка при вызове официанта:', error)
-  }
+const handleCallWaiter = async (reason, tableNumber = 5) => {
+  await waiterStore.callWaiter(reason, tableNumber)
+  showWaiterPopup.value = false
 }
 
 const closeWaiterPopup = () => {
@@ -127,19 +108,24 @@ const closeOrderPopup = () => {
   showOrderPopup.value = false
 }
 
-const confirmOrder = () => {
-  lastOrder.value = {
+const confirmOrder = async (orderData) => {
+  const orderDetails = {
     items: [...cartItems.value],
-    orderDate: new Date().toLocaleDateString('ru-RU'),
-    orderTime: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
-    totalQuantity: cartItems.value.reduce((total, item) => total + item.quantity, 0),
-    totalPrice: cartItems.value.reduce((total, item) => total + item.price * item.quantity, 0),
+    tableNumber: orderData?.tableNumber || 5,
+    customerName: orderData?.customerName || '',
+    specialRequests: orderData?.specialRequests || '',
+    total: cartItems.value.reduce((sum, item) => sum + item.price * item.quantity, 0),
   }
 
+  await ordersStore.createOrder(orderDetails)
   showSuccessNotification.value = true
   showOrderPopup.value = false
-  cartItems.value = []
 }
+
+// Инициализация при монтировании
+onMounted(async () => {
+  await menuStore.fetchMenuWithCategories()
+})
 </script>
 
 <template>
@@ -163,7 +149,12 @@ const confirmOrder = () => {
     </div>
   </main>
 
-  <WaiterPopup :show="showWaiterPopup" :is-loading="isWaiterLoading" @close="closeWaiterPopup" />
+  <WaiterPopup
+    :show="showWaiterPopup"
+    :is-loading="isWaiterLoading"
+    @close="closeWaiterPopup"
+    @call-waiter="handleCallWaiter"
+  />
 
   <OrderPopup
     :show="showOrderPopup"

@@ -61,7 +61,7 @@ const displayData = computed(() => {
           <div class="order-items">
             <div v-for="(item, index) in displayData.items" :key="index" class="order-item">
               <div class="item-info">
-                <span class="item-name">{{ item.title }}</span>
+                <span class="item-name">{{ item.name || item.title }}</span>
                 <span class="item-details">{{ item.quantity }} шт. × {{ item.price }}₽</span>
               </div>
               <div class="item-total">{{ item.quantity * item.price }}₽</div>

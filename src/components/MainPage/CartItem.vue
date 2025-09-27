@@ -1,11 +1,15 @@
 <template>
   <div class="cart-item">
     <div class="cart-item-left">
-      <img src="/src/assets/image 28.png" alt="food" />
+      <img
+        :src="item.image || placeholderImage"
+        :alt="item.name || item.title"
+        @error="handleImageError"
+      />
     </div>
     <div class="cart-item-right">
       <div class="cart-item-top">
-        <p class="cart-item__title">{{ item.title }} - {{ item.price }}₽</p>
+        <p class="cart-item__title">{{ item.name || item.title }} - {{ item.price }}₽</p>
       </div>
       <div class="cart-item-bottom">
         <div class="item-options">
@@ -20,6 +24,8 @@
 </template>
 
 <script setup>
+import placeholderImage from '@/assets/image 28.png'
+
 defineProps({
   item: {
     type: Object,
@@ -28,6 +34,10 @@ defineProps({
 })
 
 defineEmits(['addQuantity', 'removeQuantity', 'removeFromCart'])
+
+const handleImageError = (event) => {
+  event.target.src = placeholderImage
+}
 </script>
 
 <style scoped>

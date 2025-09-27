@@ -1,8 +1,15 @@
-export { useMenu } from './useMenu.js'
-export { useCategories } from './useCategories.js'
-export { useMenuWithCategories } from './useMenuWithCategories.js'
-export { useOrders } from './useOrders.js'
-export { useWaiterNotifications } from './useWaiterNotifications.js'
+// Остальные хуки
 export { useSplashSettings } from './useSplashSettings.js'
-export { useAuth } from './useAuth.js'
+
+// Прямой доступ к stores
+export {
+  useMainStore,
+  useAuthStore,
+  useMenuStore,
+  useOrdersStore,
+  useSettingsStore,
+  useWaiterStore,
+} from '@/stores'
+
+// API клиент
 export { apiClient, BASE_URL } from './api.js'

@@ -28,7 +28,8 @@
 </template>
 
 <script setup>
-import { useCategories } from '@/hooks'
+import { computed } from 'vue'
+import { useMenuStore } from '@/stores'
 
 const props = defineProps({
   selectedCategory: {
@@ -39,8 +40,11 @@ const props = defineProps({
 
 defineEmits(['selectCategory'])
 
-// Используем хук для получения категорий
-const { categories, isLoading, error } = useCategories()
+// Используем store для получения категорий
+const menuStore = useMenuStore()
+const categories = computed(() => menuStore.categories)
+const isLoading = computed(() => menuStore.isLoading)
+const error = computed(() => menuStore.error)
 </script>
 
 <style scoped>

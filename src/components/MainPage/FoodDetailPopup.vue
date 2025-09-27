@@ -51,13 +51,13 @@ const handleImageError = (event) => {
         <div class="header-left">
           <img
             :src="item.image || placeholderImage"
-            :alt="item.title"
+            :alt="item.name || item.title"
             class="food-image"
             @error="handleImageError"
           />
         </div>
         <div class="header-right">
-          <h2 class="food-title">{{ item.title }}</h2>
+          <h2 class="food-title">{{ item.name || item.title }}</h2>
           <p class="food-price">{{ item.price }}₽</p>
           <div class="quantity-controls">
             <button class="quantity-btn" @click="decreaseQuantity" :disabled="quantity <= 1">

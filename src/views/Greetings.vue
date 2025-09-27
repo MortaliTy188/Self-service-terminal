@@ -1,9 +1,9 @@
 <script setup>
 import { useRouter } from 'vue-router'
-import { useSplashSettings } from '@/hooks'
+import { useSettingsStore } from '@/stores'
 
 const router = useRouter()
-const { backgroundStyle } = useSplashSettings()
+const settingsStore = useSettingsStore()
 
 const goToMainPage = () => {
   router.push('/main')
@@ -11,7 +11,7 @@ const goToMainPage = () => {
 </script>
 
 <template>
-  <main :style="backgroundStyle">
+  <main :style="settingsStore.backgroundStyle">
     <div class="container">
       <h1 class="greetings">Добро пожаловать!</h1>
     </div>

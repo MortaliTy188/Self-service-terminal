@@ -174,6 +174,27 @@ const handleFilterChange = (filterValue) => {
   box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
 }
 
+/* Специальные стили для статусов заказов */
+.control-button.status-preparing.active {
+  background-color: #ff9800;
+  box-shadow: 0 4px 12px rgba(255, 152, 0, 0.3);
+}
+
+.control-button.status-ready.active {
+  background-color: #2196f3;
+  box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
+}
+
+.control-button.status-completed.active {
+  background-color: #4caf50;
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+}
+
+.control-button.status-cancelled.active {
+  background-color: #f44336;
+  box-shadow: 0 4px 12px rgba(244, 67, 54, 0.3);
+}
+
 /* Размеры кнопок */
 .control-button.size-small {
   max-width: 180px;

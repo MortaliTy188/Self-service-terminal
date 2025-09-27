@@ -27,8 +27,10 @@
             <span
               class="status"
               :class="{
-                pending: order.status === 'pending',
+                preparing: order.status === 'preparing',
+                ready: order.status === 'ready',
                 completed: order.status === 'completed',
+                cancelled: order.status === 'cancelled',
               }"
             >
               {{ getStatusText(order.status) }}
@@ -59,7 +61,8 @@ defineProps({
 // Функция для получения текста статуса
 const getStatusText = (status) => {
   const statusMap = {
-    pending: 'В ожидании',
+    preparing: 'Готовится',
+    ready: 'Готов к выдаче',
     completed: 'Выполнено',
     cancelled: 'Отменен',
   }
@@ -159,18 +162,33 @@ const getStatusText = (status) => {
   font-weight: bold;
   text-transform: uppercase;
   display: inline-block;
+  min-width: 120px;
+  text-align: center;
+  box-sizing: border-box;
 }
 
-.status.pending {
-  background-color: #fff3cd;
-  color: #856404;
-  border: 1px solid #ffeaa7;
+.status.preparing {
+  background-color: #fff3e0;
+  color: #e65100;
+  border: 1px solid #ffcc02;
+}
+
+.status.ready {
+  background-color: #e3f2fd;
+  color: #0d47a1;
+  border: 1px solid #2196f3;
 }
 
 .status.completed {
   background-color: #d4edda;
   color: #155724;
   border: 1px solid #c3e6cb;
+}
+
+.status.cancelled {
+  background-color: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
 }
 
 .loading,

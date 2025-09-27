@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { useAuth } from '@/hooks'
+import { useAuthStore } from '@/stores'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -26,9 +26,8 @@ const router = createRouter({
 // Глобальный навигационный гард для защищенных маршрутов
 router.beforeEach((to) => {
   if (to.meta.requiresAuth) {
-    const { checkAdminAccess } = useAuth()
-
-    const authResult = checkAdminAccess()
+    const authStore = useAuthStore()
+    const authResult = authStore.checkAdminAccess()
 
     if (!authResult.success) {
       if (authResult.cancelled) {

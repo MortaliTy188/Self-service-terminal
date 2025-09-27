@@ -16,7 +16,7 @@
 <script setup>
 import { computed } from 'vue'
 import FoodCard from './FoodCard.vue'
-import { useMenu } from '@/hooks'
+import { useMenuStore } from '@/stores'
 
 const props = defineProps({
   selectedCategory: {
@@ -27,8 +27,11 @@ const props = defineProps({
 
 defineEmits(['show-detail'])
 
-// Используем хук для получения меню
-const { menu, isLoading, error, getMenuByCategory } = useMenu()
+// Используем store для получения меню
+const menuStore = useMenuStore()
+const menu = computed(() => menuStore.menuItems)
+const isLoading = computed(() => menuStore.isLoading)
+const error = computed(() => menuStore.error)
 
 // Вычисляем отфильтрованные элементы на основе выбранной категории
 const filteredItems = computed(() => {
@@ -37,7 +40,7 @@ const filteredItems = computed(() => {
     return menu.value
   }
   // Фильтруем блюда по выбранной категории
-  return getMenuByCategory(props.selectedCategory)
+  return menuStore.getMenuByCategory(props.selectedCategory)
 })
 </script>
 

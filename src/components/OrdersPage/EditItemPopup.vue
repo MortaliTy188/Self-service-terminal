@@ -166,7 +166,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { useCategories } from '@/hooks'
+import { useMenuStore } from '@/stores'
 import placeholderImage from '@/assets/image 28.png'
 
 const props = defineProps({
@@ -186,8 +186,9 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'save'])
 
-// Получаем категории
-const { categories } = useCategories()
+// Получаем категории из store
+const menuStore = useMenuStore()
+const categories = computed(() => menuStore.categories)
 
 // Реф для файла
 const fileInput = ref(null)
@@ -254,6 +255,17 @@ watch(
     }
   },
   { immediate: true },
+)
+
+// Загружаем категории при открытии popup только если они пусты
+watch(
+  () => props.show,
+  async (newShow) => {
+    if (newShow && categories.value.length === 0) {
+      // Загружаем категории только если их еще нет
+      await menuStore.fetchCategories()
+    }
+  },
 )
 
 const closePopup = () => {

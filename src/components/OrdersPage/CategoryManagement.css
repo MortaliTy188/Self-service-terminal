@@ -99,10 +99,14 @@
   color: white;
   border: none;
   border-radius: 8px;
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 18px;
+  font-weight: 600;
   cursor: pointer;
   transition: background 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
 }
 
 .btn-save-category:hover:not(:disabled) {
@@ -213,4 +217,76 @@
   .category-actions {
     align-self: flex-end;
   }
+}
+
+/* Стили для редактирования категорий */
+.category-edit {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.edit-actions-spacer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 8px;
+}
+
+.category-edit-input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 2px solid #3b82f6;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #1f2937;
+  background: #f8fafc;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.category-edit-input:focus {
+  border-color: #1d4ed8;
+  background: white;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Кнопки редактирования категории */
+.btn-save-edit,
+.btn-cancel-category {
+  background: none;
+  border: none;
+  padding: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+}
+
+.btn-save-edit {
+  color: #059669;
+}
+
+.btn-save-edit:hover:not(:disabled) {
+  background: rgba(5, 150, 105, 0.1);
+}
+
+.btn-save-edit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-cancel-category {
+  color: #dc2626;
+}
+
+.btn-cancel-category:hover {
+  background: rgba(220, 38, 38, 0.1);
 }

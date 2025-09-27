@@ -106,7 +106,7 @@
                 @click="createNewCategory"
                 :disabled="!newCategoryName.trim()"
               >
-                Добавить
+                +
               </button>
             </div>
           </div>
@@ -119,18 +119,68 @@
             </div>
             <div v-else class="category-items">
               <div v-for="category in categories" :key="category.id" class="category-item">
-                <div class="category-info">
+                <!-- Обычный вид категории -->
+                <div
+                  v-if="!editingCategory || editingCategory.id !== category.id"
+                  class="category-info"
+                >
                   <span class="category-name">{{ category.name }}</span>
                   <span class="category-count">
                     ({{ getItemsCountByCategory(category.id) }} блюд)
                   </span>
                 </div>
+
+                <!-- Режим редактирования -->
+                <div v-else class="category-edit">
+                  <input
+                    v-model="editCategoryName"
+                    type="text"
+                    class="category-edit-input"
+                    @keyup.enter="saveEditCategory"
+                    @keyup.escape="cancelEditCategory"
+                    placeholder="Новое название"
+                  />
+                  <div class="edit-actions-spacer">
+                    <button
+                      class="btn-save-edit"
+                      @click="saveEditCategory"
+                      :disabled="!editCategoryName.trim()"
+                      title="Сохранить"
+                    >
+                      ✅
+                    </button>
+                    <button
+                      class="btn-cancel-category"
+                      @click="cancelEditCategory"
+                      title="Отменить"
+                    >
+                      ❌
+                    </button>
+                  </div>
+                </div>
+
                 <div class="category-actions">
-                  <button class="btn-edit-category" @click="editCategory(category)">✏️</button>
+                  <!-- Обычные кнопки -->
+                  <template v-if="!editingCategory || editingCategory.id !== category.id">
+                    <button
+                      class="btn-edit-category"
+                      @click="editCategory(category)"
+                      title="Редактировать"
+                    >
+                      ✏️
+                    </button>
+                  </template>
+
+                  <!-- В режиме редактирования показываем только кнопку удаления -->
+                  <!-- Кнопка удаления (всегда показываем) -->
                   <button
                     class="btn-delete-category"
                     @click="deleteCategory(category.id)"
-                    :disabled="getItemsCountByCategory(category.id) > 0"
+                    :disabled="
+                      getItemsCountByCategory(category.id) > 0 ||
+                      (editingCategory && editingCategory.id === category.id)
+                    "
+                    title="Удалить категорию"
                   >
                     🗑️
                   </button>
@@ -146,7 +196,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { useCategories } from '@/hooks'
+import { useMenuStore } from '@/stores'
 import placeholderImage from '@/assets/image 28.png'
 import EditItemPopup from './EditItemPopup.vue'
 import './CategoryManagement.css'
@@ -166,7 +216,15 @@ const props = defineProps({
   },
 })
 
-const emit = defineEmits(['edit-item', 'toggle-status', 'add-item', 'retry', 'save-item'])
+const emit = defineEmits([
+  'edit-item',
+  'toggle-status',
+  'add-item',
+  'retry',
+  'save-item',
+  'category-created',
+  'category-updated',
+])
 
 // Состояние попапа редактирования
 const showEditPopup = ref(false)
@@ -176,9 +234,12 @@ const isEditMode = ref(false)
 // Состояние попапа категорий
 const showCategoriesPopup = ref(false)
 const newCategoryName = ref('')
+const editingCategory = ref(null)
+const editCategoryName = ref('')
 
 // Получаем категории для отображения названий
-const { categories, createCategory } = useCategories()
+const menuStore = useMenuStore()
+const categories = computed(() => menuStore.categories || [])
 
 const getCategoryName = (categoryId) => {
   const category = categories.value.find((cat) => cat.id === categoryId)
@@ -195,25 +256,18 @@ const handleImageError = (event) => {
 
 // Функции для работы с попапом
 const editItem = (item) => {
-  console.log('EditItem clicked:', item)
   selectedItem.value = { ...item }
   isEditMode.value = true
   showEditPopup.value = true
-  console.log('Popup state:', {
-    showEditPopup: showEditPopup.value,
-    selectedItem: selectedItem.value,
-  })
 }
 
 const addNewItem = () => {
-  console.log('Add new item clicked')
   selectedItem.value = null
   isEditMode.value = false
   showEditPopup.value = true
 }
 
 const closeEditPopup = () => {
-  console.log('Closing popup')
   showEditPopup.value = false
   selectedItem.value = null
   isEditMode.value = false
@@ -229,6 +283,7 @@ const handleSave = (itemData) => {
 const closeCategoriesPopup = () => {
   showCategoriesPopup.value = false
   newCategoryName.value = ''
+  cancelEditCategory()
 }
 
 const getItemsCountByCategory = (categoryId) => {
@@ -241,15 +296,14 @@ const createNewCategory = async () => {
   }
 
   try {
-    console.log('Создание новой категории:', newCategoryName.value)
-
-    // Используем функцию из хука
-    const newCategory = await createCategory({ name: newCategoryName.value.trim() })
+    // Используем функцию из store
+    const newCategory = await menuStore.addCategory({ name: newCategoryName.value.trim() })
 
     // Очищаем поле
     newCategoryName.value = ''
 
-    console.log('Категория успешно создана:', newCategory)
+    // Эмитим событие для обновления фильтров в родительском компоненте
+    emit('category-created', newCategory)
 
     // Показываем уведомление об успехе
     alert(`Категория "${newCategory.name}" успешно создана и добавлена в фильтры!`)
@@ -261,8 +315,41 @@ const createNewCategory = async () => {
 }
 
 const editCategory = (category) => {
-  console.log('Редактирование категории:', category)
-  // Здесь можно добавить функционал редактирования категории
+  editingCategory.value = { ...category }
+  editCategoryName.value = category.name
+}
+
+const saveEditCategory = async () => {
+  if (!editCategoryName.value.trim() || !editingCategory.value) {
+    return
+  }
+
+  try {
+    console.log('Сохранение изменений категории:', editingCategory.value.id, editCategoryName.value)
+
+    // Используем функцию из store для обновления категории
+    const updatedCategory = await menuStore.updateCategory(editingCategory.value.id, {
+      name: editCategoryName.value.trim(),
+    })
+
+    console.log('Категория успешно обновлена:', updatedCategory)
+
+    // Сбрасываем состояние редактирования
+    cancelEditCategory()
+
+    // Эмитим событие для обновления фильтров
+    emit('category-updated', updatedCategory)
+
+    alert(`Категория успешно переименована в "${updatedCategory.name}"!`)
+  } catch (error) {
+    console.error('Ошибка при обновлении категории:', error)
+    alert(`Ошибка: ${error.message}`)
+  }
+}
+
+const cancelEditCategory = () => {
+  editingCategory.value = null
+  editCategoryName.value = ''
 }
 
 const deleteCategory = async (categoryId) => {

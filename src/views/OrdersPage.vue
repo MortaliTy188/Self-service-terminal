@@ -28,6 +28,8 @@
           @add-item="handleAddItem"
           @save-item="handleSaveItem"
           @retry="loadMenuData"
+          @category-created="handleCategoryCreated"
+          @category-updated="handleCategoryUpdated"
         />
       </template>
 
@@ -59,8 +61,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { useOrders, useWaiterNotifications, useMenu, useCategories } from '@/hooks'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { useOrdersStore, useWaiterStore, useMenuStore } from '@/stores'
 import {
   LeftSidebar,
   OrderFilters,
@@ -71,18 +73,22 @@ import {
   SettingsManagement,
 } from '@/components/OrdersPage'
 
-// Используем композицию для работы с заказами
-const { orders, isLoading, error, fetchOrders } = useOrders()
+// Используем Pinia stores
+const ordersStore = useOrdersStore()
+const waiterStore = useWaiterStore()
+const menuStore = useMenuStore()
 
-// Используем композицию для работы с меню
-const { menu: menuItems, isLoading: isMenuLoading, error: menuError, fetchMenu } = useMenu()
+// Данные из stores
+const orders = computed(() => ordersStore.orders)
+const isLoading = computed(() => ordersStore.isLoading)
+const error = computed(() => ordersStore.error)
 
-// Используем композицию для работы с категориями
-const { categories, fetchCategories } = useCategories()
+const menuItems = computed(() => menuStore.menuItems)
+const isMenuLoading = computed(() => menuStore.isLoading)
+const menuError = computed(() => menuStore.error)
+const categories = computed(() => menuStore.categories)
 
-// Используем композицию для работы с уведомлениями официанта
-const { notifications, fetchWaiterNotifications, markNotificationAsResolved } =
-  useWaiterNotifications()
+const notifications = computed(() => waiterStore.notifications)
 
 // Активная вкладка
 const activeTab = ref('orders')
@@ -103,11 +109,18 @@ const orderFilters = computed(() => {
       count: items.length,
     },
     {
-      value: 'pending',
-      label: 'В ожидании',
-      icon: '⏳',
-      count: items.filter((order) => order.status === 'pending').length,
-      class: { 'status-pending': true },
+      value: 'preparing',
+      label: 'Готовится',
+      icon: '👨‍🍳',
+      count: items.filter((order) => order.status === 'preparing').length,
+      class: { 'status-preparing': true },
+    },
+    {
+      value: 'ready',
+      label: 'Готов к выдаче',
+      icon: '🔔',
+      count: items.filter((order) => order.status === 'ready').length,
+      class: { 'status-ready': true },
     },
     {
       value: 'completed',
@@ -116,13 +129,20 @@ const orderFilters = computed(() => {
       count: items.filter((order) => order.status === 'completed').length,
       class: { 'status-completed': true },
     },
+    {
+      value: 'cancelled',
+      label: 'Отменённые',
+      icon: '❌',
+      count: items.filter((order) => order.status === 'cancelled').length,
+      class: { 'status-cancelled': true },
+    },
   ]
 })
 
 // Конфигурация фильтров меню
 const menuFilters = computed(() => {
   // Дополнительная защита от undefined
-  if (!menuItems || !categories) {
+  if (!menuItems.value || !categories.value) {
     return [
       {
         value: 'all',
@@ -152,13 +172,13 @@ const menuFilters = computed(() => {
       value: 'active',
       label: 'Активные',
       icon: '✅',
-      count: items.filter((item) => item.isActive !== false).length,
+      count: items.filter((item) => item.is_available !== false).length,
     },
     {
       value: 'inactive',
       label: 'Неактивные',
       icon: '⛔',
-      count: items.filter((item) => item.isActive === false).length,
+      count: items.filter((item) => item.is_available === false).length,
     },
   ]
 })
@@ -219,19 +239,18 @@ const filteredMenuItems = computed(() => {
 // Функция загрузки данных меню
 const loadMenuData = async () => {
   try {
-    await fetchMenu()
+    await menuStore.fetchMenuWithCategories()
   } catch (error) {
     console.error('Ошибка загрузки меню:', error)
   }
 }
 
 // Функция обновления страницы
-const refreshPage = () => {
-  fetchOrders()
-  fetchWaiterNotifications()
+const refreshPage = async () => {
+  await ordersStore.fetchOrders()
+  await waiterStore.fetchNotifications()
   if (activeTab.value === 'menu') {
-    fetchCategories()
-    loadMenuData()
+    await loadMenuData()
   }
 }
 
@@ -300,6 +319,44 @@ const showNewNotification = (notification) => {
   showNotificationPopup.value = true
 }
 
+// Функция для обработки создания новой категории
+const handleCategoryCreated = async (newCategory) => {
+  console.log('Новая категория создана:', newCategory)
+
+  try {
+    // НЕ вызываем fetchCategories(), так как категория уже добавлена в store
+    // await menuStore.fetchCategories() - это перезаписывает наши данные!
+
+    // Ждем следующий тик для обновления reactive свойств
+    await nextTick()
+
+    console.log('Категории после создания:', categories.value)
+    console.log('Обновленные фильтры меню:', menuFilters.value)
+
+    // Принудительно обновляем активную вкладку, чтобы показать изменения
+    if (activeTab.value === 'menu') {
+      // Можно добавить дополнительную логику обновления UI если нужно
+    }
+  } catch (error) {
+    console.error('Ошибка при обновлении категорий:', error)
+  }
+}
+
+// Функция для обработки обновления категории
+const handleCategoryUpdated = async (updatedCategory) => {
+  console.log('Категория обновлена:', updatedCategory)
+
+  try {
+    // Ждем следующий тик для обновления reactive свойств
+    await nextTick()
+
+    console.log('Категории после обновления:', categories.value)
+    console.log('Обновленные фильтры меню:', menuFilters.value)
+  } catch (error) {
+    console.error('Ошибка при обновлении интерфейса:', error)
+  }
+}
+
 const closeNotificationPopup = () => {
   showNotificationPopup.value = false
   currentNotification.value = {}
@@ -307,7 +364,7 @@ const closeNotificationPopup = () => {
 
 const resolveNotification = async (notificationId) => {
   try {
-    await markNotificationAsResolved(notificationId)
+    await waiterStore.resolveNotification(notificationId)
     console.log('Уведомление отмечено как выполненное')
   } catch (error) {
     console.error('Ошибка при отметке уведомления:', error)
@@ -319,13 +376,14 @@ watch(
   notifications,
   (newNotifications, oldNotifications) => {
     if (newNotifications.length > 0 && oldNotifications) {
-      // Находим новые уведомления со статусом 'pending'
+      // Находим новые неразрешенные уведомления
       const pendingNotifications = newNotifications.filter(
-        (n) => n.status === 'pending' && !oldNotifications.some((old) => old.id === n.id),
+        (n) => !n.resolved && !oldNotifications.some((old) => old.id === n.id),
       )
 
       // Показываем popup для первого нового уведомления
       if (pendingNotifications.length > 0) {
+        console.log('Показываем новое уведомление:', pendingNotifications[0])
         showNewNotification(pendingNotifications[0])
       }
     }
@@ -378,16 +436,24 @@ const handleSaveSettings = (settingsData) => {
 }
 
 // Инициализация при монтировании компонента
-onMounted(() => {
+onMounted(async () => {
   // Загружаем базовые данные
-  fetchCategories()
-  fetchMenu()
-  fetchWaiterNotifications()
+  await menuStore.fetchMenuWithCategories()
+  await ordersStore.fetchOrders()
+  await waiterStore.fetchNotifications()
+
+  // Проверяем, есть ли неразрешенные уведомления при загрузке
+  const activeNotifications = notifications.value.filter((n) => !n.resolved)
+  if (activeNotifications.length > 0) {
+    console.log('Найдены активные уведомления при загрузке:', activeNotifications)
+    // Показываем первое активное уведомление
+    showNewNotification(activeNotifications[0])
+  }
 
   // Проверяем уведомления каждые 30 секунд
   // В реальном приложении здесь будет WebSocket подключение
   const notificationInterval = setInterval(() => {
-    fetchWaiterNotifications()
+    waiterStore.fetchNotifications()
   }, 30000)
 
   // Очистка интервала при размонтировании

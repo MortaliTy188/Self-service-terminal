@@ -250,6 +250,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useSplashSettings } from '@/hooks'
+import { useSettingsStore } from '@/stores'
 import placeholderImageSrc from '@/assets/mainBackground.png'
 
 const emit = defineEmits(['save-settings'])
@@ -261,6 +262,9 @@ const {
   updateDuration,
   updateShowOnStartup,
 } = useSplashSettings()
+
+// Settings store для прямого доступа к функциям
+const settingsStore = useSettingsStore()
 
 // Состояния попапов
 const showAccountPopup = ref(false)
@@ -310,10 +314,16 @@ const openApiSettings = () => {
 
 const openSplashSettings = () => {
   // Загружаем текущие сохраненные настройки при открытии попапа
+  const currentSettings = savedSplashSettings.value || {
+    currentImage: '',
+    duration: 3,
+    showOnStartup: true,
+  }
+
   splashSettings.value = {
-    currentImage: savedSplashSettings.value.currentImage,
-    duration: savedSplashSettings.value.duration,
-    showOnStartup: savedSplashSettings.value.showOnStartup,
+    currentImage: currentSettings.currentImage,
+    duration: currentSettings.duration,
+    showOnStartup: currentSettings.showOnStartup,
   }
   showSplashPopup.value = true
 }
@@ -349,12 +359,13 @@ const saveApiSettings = () => {
 const saveSplashSettings = () => {
   console.log('Сохранение настроек заставки:', splashSettings.value)
 
-  // Сохраняем настройки через хук (это обновит глобальное состояние и localStorage)
+  // Сохраняем настройки через store
   if (splashSettings.value.currentImage) {
-    updateSplashImage(splashSettings.value.currentImage)
+    // Используем новую функцию для base64 строки
+    settingsStore.updateSplashImageBase64(splashSettings.value.currentImage)
   }
-  updateDuration(splashSettings.value.duration)
-  updateShowOnStartup(splashSettings.value.showOnStartup)
+  settingsStore.updateSplashDuration(splashSettings.value.duration)
+  settingsStore.updateShowOnStartup(splashSettings.value.showOnStartup)
 
   // Также эмитим событие для родительского компонента
   emit('save-settings', { type: 'splash', data: splashSettings.value })
