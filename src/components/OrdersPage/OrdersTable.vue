@@ -70,6 +70,7 @@ const getStatusText = (status) => {
 <style scoped>
 .container-right-body {
   flex: 1;
+  padding-bottom: 40px;
 }
 
 .orders-table {

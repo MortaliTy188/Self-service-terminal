@@ -297,6 +297,10 @@ const deleteCategory = async (categoryId) => {
 .menu-management {
   height: 100%;
   overflow-y: auto;
+  overflow-x: hidden;
+  width: 100%;
+  box-sizing: border-box;
+  padding-bottom: 20px;
 }
 
 .header {
@@ -309,6 +313,9 @@ const deleteCategory = async (categoryId) => {
   position: sticky;
   top: 0;
   z-index: 10;
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
 }
 
 .header h2 {
@@ -322,6 +329,8 @@ const deleteCategory = async (categoryId) => {
   display: flex;
   gap: 12px;
   align-items: center;
+  flex-shrink: 0;
+  min-width: 0;
 }
 
 .btn-categories {
@@ -420,9 +429,11 @@ const deleteCategory = async (categoryId) => {
 
 .menu-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 20px;
-  padding: 20px;
+  padding: 20px 20px 40px 20px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .menu-item-card {
@@ -638,32 +649,6 @@ const deleteCategory = async (categoryId) => {
     width: 100%;
     justify-content: center;
   }
-}
-
-.retry-btn:hover {
-  background: #e55a2b;
-}
-
-.menu-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-  gap: 20px;
-  padding: 20px;
-}
-
-.menu-item-card {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
-  transition:
-    transform 0.2s,
-    box-shadow 0.2s;
-}
-
-.menu-item-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
 }
 
 .item-image {

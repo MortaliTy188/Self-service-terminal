@@ -12,7 +12,7 @@ export function useMenu() {
     error.value = null
 
     try {
-      const response = await fetch(`${BASE_URL}/menu`)
+      const response = await fetch('/api/menu')
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)

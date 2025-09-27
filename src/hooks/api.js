@@ -2,7 +2,7 @@ const BASE_URL = 'http://83.222.9.90:8080'
 
 class ApiClient {
   async request(endpoint, options = {}) {
-    const url = `${BASE_URL}${endpoint}`
+    const url = `/api${endpoint}`
 
     try {
       const response = await fetch(url, {

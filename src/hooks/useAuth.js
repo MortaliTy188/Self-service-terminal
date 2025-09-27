@@ -17,7 +17,7 @@ export function useAuth() {
     try {
       console.log('Проверка админ-ключа на сервере...')
 
-      const response = await fetch(`${BASE_URL}/admin/verify`, {
+      const response = await fetch('/api/admin/verify', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -64,7 +64,7 @@ export function useAuth() {
     }
 
     try {
-      const response = await fetch(`${BASE_URL}/admin/validate-session`, {
+      const response = await fetch('/api/admin/validate-session', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

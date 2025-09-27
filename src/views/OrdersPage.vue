@@ -401,16 +401,21 @@ onMounted(() => {
 .container {
   display: flex;
   gap: 19px;
-  height: 90vh;
-  width: 80vw;
-  padding: 17px 21px;
+  height: 100vh;
+  width: 100vw;
+  padding: 17px 21px 40px 21px;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .container-right {
   flex: 1;
   display: flex;
   flex-direction: column;
-  max-width: 1400px;
+  overflow: hidden;
+  min-width: 0;
+  width: 100%;
+  padding-bottom: 20px;
 }
 
 .placeholder {

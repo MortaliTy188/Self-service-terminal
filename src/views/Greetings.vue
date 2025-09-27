@@ -75,7 +75,7 @@ main {
   }
 }
 
-@media (min-width: 1024px) {
+@media (max-width: 1280px) {
   .greetings {
     font-size: 5rem;
   }
@@ -83,7 +83,7 @@ main {
     width: 706px;
     height: 108px;
     padding: 9px 216px;
-    margin-bottom: 41px;
+    margin-bottom: 100px;
   }
 }
 </style>

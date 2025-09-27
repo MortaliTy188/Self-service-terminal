@@ -381,7 +381,7 @@ const testConnection = async () => {
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), apiSettings.value.requestTimeout * 1000)
 
-    const response = await fetch(`${apiSettings.value.serverUrl}/health`, {
+    const response = await fetch('/api/health', {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -511,8 +511,9 @@ onMounted(() => {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
   gap: 25px;
-  max-width: 1200px;
+  width: 100%;
   margin: 0 auto;
+  padding-bottom: 40px;
 }
 
 .settings-card {

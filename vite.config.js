@@ -15,6 +15,14 @@ export default defineConfig({
   server: {
     host: '127.0.0.1',
     port: 3000,
-    allowedHosts: ['ypgb66zjkf0a.share.zrok.io'],
+    allowedHosts: ['91lvgnv9zqis.share.zrok.io'],
+    proxy: {
+      '/api': {
+        target: 'http://83.222.9.90:8080',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ''),
+        secure: false,
+      },
+    },
   },
 })

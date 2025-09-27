@@ -20,7 +20,7 @@ export function useOrders() {
 
       // TODO: Раскомментировать когда API будет готово
       /*
-      const response = await fetch(`${BASE_URL}/orders`)
+      const response = await fetch('/api/orders')
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)

@@ -13,7 +13,7 @@ export function useCategories() {
     error.value = null
 
     try {
-      const response = await fetch(`${BASE_URL}/categories`)
+      const response = await fetch('/api/categories')
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
@@ -52,7 +52,7 @@ export function useCategories() {
       }
 
       // Реальный API вызов (пока закомментирован)
-      // const response = await fetch(`${BASE_URL}/categories`, {
+      // const response = await fetch('/api/categories', {
       //   method: 'POST',
       //   headers: {
       //     'Content-Type': 'application/json',

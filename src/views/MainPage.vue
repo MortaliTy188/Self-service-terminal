@@ -218,6 +218,12 @@ body {
   background: white;
 }
 
+@media screen and (max-width: 1280px) {
+  .main-container {
+    padding-bottom: 75px;
+  }
+}
+
 .main-container-left {
   display: flex;
   flex-direction: column;

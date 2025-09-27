@@ -58,6 +58,13 @@ defineEmits(['refresh', 'tab-change'])
   display: flex;
   flex-direction: column;
   gap: 17px;
+  padding-bottom: 20px;
+}
+
+@media screen and (max-width: 1280px) {
+  .container-left {
+    padding-bottom: 40px;
+  }
 }
 
 .title {
@@ -67,6 +74,7 @@ defineEmits(['refresh', 'tab-change'])
   background-color: #d9d9d9;
   border-radius: 25px;
   text-align: center;
+  margin: 0;
 }
 
 .controls {
