@@ -442,9 +442,12 @@ const response = await fetch('/api/menu', {
       "price": 350,
       "image": "https://images.unsplash.com/photo-1547592166-23ac45744acd?w=300",
       "category_id": 5,
-      "is_available": true,
       "weight": 400,
-      "calories": 250
+      "calories": 250,
+      "ingredients": "Говядина, свекла, капуста, морковь, лук",
+      "isActive": true,
+      "isRecommended": false,
+      "isVegetarian": false
     }
   ],
   "total": 8,
@@ -461,9 +464,12 @@ const response = await fetch('/api/menu', {
 - `price` - Цена в рублях (обязательно)
 - `image` - URL изображения (может быть null)
 - `category_id` - ID категории (обязательно)
-- `is_available` - Доступность для заказа
 - `weight` - Вес в граммах
 - `calories` - Калорийность
+- `ingredients` - Состав блюда (строка)
+- `isActive` - Активность блюда (boolean)
+- `isRecommended` - Рекомендуемое (boolean)
+- `isVegetarian` - Вегетарианское (boolean)
 
 #### `POST /api/menu`
 
@@ -473,14 +479,17 @@ const response = await fetch('/api/menu', {
 
 ```javascript
 const formData = {
-  name: 'Новое блюдо',
-  description: 'Описание блюда',
+  name: 'Борщ украинский',
+  description: 'Традиционный украинский борщ с говядиной, свеклой и сметаной',
   price: 350,
-  image: 'https://example.com/image.jpg', // или null
   category_id: 5,
-  is_available: true,
+  image: 'https://images.unsplash.com/photo-1547592166-23ac45744acd', // или null
   weight: 400,
   calories: 250,
+  ingredients: 'Говядина, свекла, капуста, морковь, лук, томатная паста',
+  isActive: true,
+  isRecommended: false,
+  isVegetarian: false,
 }
 
 const response = await fetch('/api/menu', {
@@ -501,13 +510,20 @@ const response = await fetch('/api/menu', {
   "message": "Menu item created successfully",
   "data": {
     "id": 9,
-    "name": "Новое блюдо",
-    "description": "Описание блюда",
+    "name": "Борщ украинский",
+    "description": "Традиционный украинский борщ с говядиной, свеклой и сметаной",
     "price": 350,
-    "image": "https://example.com/image.jpg",
     "category_id": 5,
-    "is_available": true,
+    "image": "https://images.unsplash.com/photo-1547592166-23ac45744acd",
     "weight": 400,
+    "calories": 250,
+    "ingredients": "Говядина, свекла, капуста, морковь, лук, томатная паста",
+    "isActive": true,
+    "isRecommended": false,
+    "isVegetarian": false,
+    "created_at": "2025-09-27T12:00:00.000Z"
+  }
+}
     "calories": 250,
     "created_at": "2025-09-27T12:00:00.000Z"
   }
@@ -522,9 +538,10 @@ const response = await fetch('/api/menu', {
 
 ```javascript
 const updates = {
-  name: 'Обновленное название',
-  price: 400,
-  is_available: false,
+  name: 'Борщ украинский (обновленный)',
+  price: 380,
+  isActive: false,
+  isRecommended: true,
   // только измененные поля
 }
 
@@ -544,11 +561,11 @@ const response = await fetch(`/api/menu/${itemId}`, {
 {
   "message": "Menu item updated successfully",
   "data": {
-    // полные обновленные данные блюда
     "id": 5,
-    "name": "Обновленное название",
-    "price": 400,
-    "is_available": false,
+    "name": "Борщ украинский (обновленный)",
+    "price": 380,
+    "isActive": false,
+    "isRecommended": true,
     "updated_at": "2025-09-27T12:30:00.000Z"
   }
 }
@@ -677,6 +694,19 @@ const response = await fetch(`/api/categories/${categoryId}`, {
 })
 ```
 
+**Ответ сервера (200 OK):**
+
+```javascript
+{
+  "message": "Category updated successfully",
+  "data": {
+    "id": 5,
+    "name": "Обновленное название",
+    "updated_at": "2025-09-27T12:30:00.000Z"
+  }
+}
+```
+
 #### `DELETE /api/categories/{id}`
 
 **Назначение**: Удаление категории
@@ -690,6 +720,15 @@ const response = await fetch(`/api/categories/${categoryId}`, {
     Authorization: 'Bearer {apiKey}',
   },
 })
+```
+
+**Ответ сервера (200 OK):**
+
+```javascript
+{
+  "message": "Category deleted successfully",
+  "deleted_id": 5
+}
 ```
 
 ### 🛒 Управление заказами
@@ -1418,46 +1457,6 @@ await fetch(`/api/orders/${newOrder.id}/status`, {
 console.log('Заказ готов к выдаче')
 ```
 
-### Отладка и логирование
-
-```javascript
-// Включение детального логирования
-const DEBUG_API = true
-
-const apiRequest = async (endpoint, options = {}) => {
-  if (DEBUG_API) {
-    console.log(`🔵 API Request: ${options.method || 'GET'} ${endpoint}`)
-    console.log('Options:', options)
-  }
-
-  const startTime = performance.now()
-
-  try {
-    const response = await fetch(`/api${endpoint}`, {
-      headers: { 'Content-Type': 'application/json' },
-      ...options,
-    })
-
-    const data = await response.json()
-    const duration = Math.round(performance.now() - startTime)
-
-    if (DEBUG_API) {
-      console.log(`✅ API Response (${duration}ms):`, data)
-    }
-
-    return data
-  } catch (error) {
-    const duration = Math.round(performance.now() - startTime)
-
-    if (DEBUG_API) {
-      console.log(`❌ API Error (${duration}ms):`, error)
-    }
-
-    throw error
-  }
-}
-```
-
 ## 🔄 Миграция с mock данных на реальный API
 
 ### Этапы интеграции
@@ -1466,46 +1465,6 @@ const apiRequest = async (endpoint, options = {}) => {
 2. **Этап 2**: Добавление обработки ошибок и fallback
 3. **Этап 3**: Подключение WebSocket для real-time обновлений
 4. **Этап 4**: Оптимизация кеширования и производительности
-
-### Переключение между mock и реальными данными
-
-```javascript
-// В настройках store
-const USE_MOCK_DATA = false // переключатель
-
-const fetchMenu = async () => {
-  if (USE_MOCK_DATA) {
-    // Возвращаем mock данные
-    return mockMenuData
-  } else {
-    // Реальный API вызов
-    return await apiRequest('/menu')
-  }
-}
-```
-
-### Конфигурация для разных окружений
-
-```javascript
-// config/environments.js
-export const environments = {
-  development: {
-    apiUrl: 'http://localhost:8080',
-    useMockData: true,
-    debugMode: true,
-  },
-  staging: {
-    apiUrl: 'http://staging.example.com:8080',
-    useMockData: false,
-    debugMode: true,
-  },
-  production: {
-    apiUrl: 'http://83.222.9.90:8080',
-    useMockData: false,
-    debugMode: false,
-  },
-}
-```
 
 ## 🔧 Установка и запуск
 
