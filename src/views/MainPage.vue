@@ -43,8 +43,23 @@ const selectCategory = (categoryId) => {
   }
 }
 
-const addToCart = (itemData) => {
-  ordersStore.addToCart(itemData)
+const addToCart = (eventData) => {
+  // Обработка данных от FoodDetailPopup
+  if (eventData.success !== undefined) {
+    // Данные уже обработаны в store через addToCartServer
+    console.log('📦 Товар обработан через store:', eventData)
+    return
+  }
+
+  // Обработка старого формата для обратной совместимости
+  if (eventData.cartData) {
+    console.log('📦 Обновляем корзину данными с сервера:', eventData.cartData)
+    ordersStore.updateCartFromServer(eventData.cartData)
+  } else {
+    // Fallback для локального добавления
+    console.log('📦 Локальное добавление в корзину:', eventData)
+    ordersStore.addToCart(eventData)
+  }
 }
 
 const showFoodDetail = (item) => {
@@ -57,21 +72,72 @@ const closeFoodDetailPopup = () => {
   selectedFoodItem.value = null
 }
 
-const addQuantity = (item) => {
-  ordersStore.addToCart(item, 1)
-}
-
-const removeQuantity = (index) => {
-  const cartItem = cartItems.value[index]
-  if (cartItem) {
-    ordersStore.updateCartItemQuantity(cartItem.id, cartItem.quantity - 1)
+const addQuantity = async (item) => {
+  // Используем server API для добавления количества
+  try {
+    const result = await ordersStore.addToCartServer(item.id, 1)
+    if (!result.success) {
+      // Fallback на локальное обновление
+      ordersStore.addToCart(item, 1)
+    }
+  } catch (error) {
+    // Fallback на локальное обновление
+    ordersStore.addToCart(item, 1)
   }
 }
 
-const removeFromCart = (index) => {
+const removeQuantity = async (index) => {
   const cartItem = cartItems.value[index]
   if (cartItem) {
-    ordersStore.removeFromCart(cartItem.id)
+    if (cartItem.quantity > 1) {
+      // Если количество больше 1, используем стратегию: удалить и добавить с новым количеством
+      try {
+        // Сначала удаляем товар полностью
+        const removeResult = await ordersStore.removeFromCartServer(cartItem.id)
+        if (removeResult.success) {
+          // Затем добавляем с уменьшенным количеством
+          const addResult = await ordersStore.addToCartServer(cartItem.id, cartItem.quantity - 1)
+          if (!addResult.success) {
+            // Если не удалось добавить обратно, пробуем восстановить локально
+            ordersStore.addToCart(cartItem, cartItem.quantity)
+          }
+        } else {
+          // Fallback на локальное обновление
+          ordersStore.updateCartItemQuantity(cartItem.id, cartItem.quantity - 1)
+        }
+      } catch (error) {
+        // Fallback на локальное обновление
+        ordersStore.updateCartItemQuantity(cartItem.id, cartItem.quantity - 1)
+      }
+    } else {
+      // Если количество равно 1, удаляем товар полностью
+      try {
+        const result = await ordersStore.removeFromCartServer(cartItem.id)
+        if (!result.success) {
+          // Fallback на локальное удаление
+          ordersStore.removeFromCart(cartItem.id)
+        }
+      } catch (error) {
+        // Fallback на локальное удаление
+        ordersStore.removeFromCart(cartItem.id)
+      }
+    }
+  }
+}
+
+const removeFromCart = async (index) => {
+  const cartItem = cartItems.value[index]
+  if (cartItem) {
+    try {
+      const result = await ordersStore.removeFromCartServer(cartItem.id)
+      if (!result.success) {
+        // Fallback на локальное удаление
+        ordersStore.removeFromCart(cartItem.id)
+      }
+    } catch (error) {
+      // Fallback на локальное удаление
+      ordersStore.removeFromCart(cartItem.id)
+    }
   }
 }
 
@@ -125,6 +191,8 @@ const confirmOrder = async (orderData) => {
 // Инициализация при монтировании
 onMounted(async () => {
   await menuStore.fetchMenuWithCategories()
+  // Загружаем корзину с сервера
+  await ordersStore.fetchCart()
 })
 </script>
 

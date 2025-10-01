@@ -9,7 +9,7 @@ export const useAuthStore = defineStore('auth', () => {
   const adminUser = ref(null)
 
   // Constants
-  const BASE_URL = 'http://83.222.9.90:8080'
+  const BASE_URL = 'http://localhost:8080'
   const VALID_ADMIN_KEYS = ['admin123', 'terminal-admin', 'management-key', 'settings-access']
 
   // Getters
@@ -19,80 +19,11 @@ export const useAuthStore = defineStore('auth', () => {
   })
 
   // Actions
-  const verifyAdminKey = (adminKey) => {
-    console.log('Проверка админ-ключа (клиентская версия)...')
-
-    if (VALID_ADMIN_KEYS.includes(adminKey)) {
-      // Создаем сессию на 2 часа
-      const expiryTime = new Date()
-      expiryTime.setHours(expiryTime.getHours() + 2)
-
-      sessionId.value = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-      sessionExpiry.value = expiryTime.getTime()
-      isAuthenticated.value = true
-
-      console.log('Админ-ключ успешно подтвержден (клиентская проверка)')
-      return {
-        success: true,
-        message: 'Доступ к админ-панели получен',
-      }
-    } else {
-      console.log('Неверный админ-ключ')
-      return {
-        success: false,
-        error: 'Неверный админ-ключ',
-      }
-    }
-  }
-
-  const promptForAdminKey = () => {
-    const adminKey = prompt('Введите админ-ключ для доступа к панели управления:')
-
-    if (!adminKey) {
-      return { success: false, cancelled: true }
-    }
-
-    if (adminKey.trim().length < 3) {
-      alert('Админ-ключ слишком короткий')
-      return { success: false, error: 'Слишком короткий ключ' }
-    }
-
-    return verifyAdminKey(adminKey.trim())
-  }
-
-  const validateSession = () => {
-    if (!isSessionValid.value) {
-      console.log('Сессия истекла (клиентская проверка)')
-      logout()
-      return false
-    }
-    return true
-  }
-
-  const logout = () => {
-    isAuthenticated.value = false
-    sessionId.value = null
-    sessionExpiry.value = null
-    adminUser.value = null
-    console.log('Выход из системы')
-  }
-
-  const checkAdminAccess = () => {
-    // Проверяем действительность текущей сессии
-    if (isAuthenticated.value && validateSession()) {
-      return { success: true, message: 'Доступ уже получен' }
-    }
-
-    // Запрашиваем админ-ключ
-    return promptForAdminKey()
-  }
-
-  // Server methods (готовы к использованию, но закомментированы)
-  const verifyAdminKeyServer = async (adminKey) => {
+  const verifyAdminKey = async (adminKey) => {
     try {
       console.log('Проверка админ-ключа на сервере...')
 
-      const response = await fetch('/api/admin/verify', {
+      const response = await fetch(`${BASE_URL}/admin/verify`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -108,12 +39,15 @@ export const useAuthStore = defineStore('auth', () => {
 
       if (result.success && result.sessionId) {
         sessionId.value = result.sessionId
-        sessionExpiry.value = result.expiresAt || Date.now() + 2 * 60 * 60 * 1000
+        // Преобразуем дату в timestamp
+        const expiryDate = new Date(result.expiresAt)
+        sessionExpiry.value = expiryDate.getTime()
         isAuthenticated.value = true
+
         console.log('Админ-ключ успешно подтвержден сервером')
         return {
           success: true,
-          message: 'Доступ к админ-панели получен',
+          message: result.message || 'Доступ к админ-панели получен',
         }
       } else {
         console.log('Сервер отклонил админ-ключ')
@@ -131,11 +65,36 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  const validateSessionServer = async () => {
-    if (!sessionId.value) return false
+  const promptForAdminKey = async () => {
+    const adminKey = prompt('Введите админ-ключ для доступа к панели управления:')
 
+    if (!adminKey) {
+      return { success: false, cancelled: true }
+    }
+
+    if (adminKey.trim().length < 3) {
+      alert('Админ-ключ слишком короткий')
+      return { success: false, error: 'Слишком короткий ключ' }
+    }
+
+    return await verifyAdminKey(adminKey.trim())
+  }
+
+  const validateSession = async () => {
+    if (!sessionId.value) {
+      return false
+    }
+
+    // Проверяем локальное время истечения
+    if (!isSessionValid.value) {
+      console.log('Сессия истекла (локальная проверка)')
+      logout()
+      return false
+    }
+
+    // Дополнительно проверяем на сервере
     try {
-      const response = await fetch('/api/admin/validate-session', {
+      const response = await fetch(`${BASE_URL}/admin/validate-session`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -148,16 +107,38 @@ export const useAuthStore = defineStore('auth', () => {
         if (result.valid) {
           return true
         } else {
+          console.log('Сервер отклонил сессию')
           logout()
           return false
         }
+      } else {
+        console.log('Ошибка при проверке сессии на сервере')
+        logout()
+        return false
       }
     } catch (error) {
       console.error('Ошибка проверки сессии на сервере:', error)
-      return false
+      // В случае ошибки сети, используем локальную проверку
+      return isSessionValid.value
+    }
+  }
+
+  const logout = () => {
+    isAuthenticated.value = false
+    sessionId.value = null
+    sessionExpiry.value = null
+    adminUser.value = null
+    console.log('Выход из системы')
+  }
+
+  const checkAdminAccess = async () => {
+    // Проверяем действительность текущей сессии
+    if (isAuthenticated.value && (await validateSession())) {
+      return { success: true, message: 'Доступ уже получен' }
     }
 
-    return false
+    // Запрашиваем админ-ключ
+    return await promptForAdminKey()
   }
 
   return {
@@ -176,9 +157,5 @@ export const useAuthStore = defineStore('auth', () => {
     validateSession,
     logout,
     checkAdminAccess,
-
-    // Server methods (готовы к использованию)
-    verifyAdminKeyServer,
-    validateSessionServer,
   }
 })

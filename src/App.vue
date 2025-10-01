@@ -1,10 +1,12 @@
 <script setup>
 import { RouterLink, RouterView } from 'vue-router'
+import { AdminAuthProvider } from '@/components/common'
 </script>
 
 <template>
   <main>
     <RouterView />
+    <AdminAuthProvider />
   </main>
 </template>
 

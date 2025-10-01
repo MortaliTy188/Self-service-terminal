@@ -1,13 +1,44 @@
 <script setup>
 import { useRouter } from 'vue-router'
-import { useSettingsStore } from '@/stores'
+import { useSettingsStore, useApiConfigStore } from '@/stores'
+import { onMounted, computed } from 'vue'
 
 const router = useRouter()
 const settingsStore = useSettingsStore()
+const apiConfigStore = useApiConfigStore()
 
-const goToMainPage = () => {
+// Computed свойство для проверки состояния конфигурации
+const isConfigured = computed(() => {
+  console.log('Проверяем конфигурацию:', apiConfigStore.config)
+  console.log('Полностью настроена:', apiConfigStore.isFullyConfigured)
+  return apiConfigStore.isFullyConfigured
+})
+
+const goToMainPage = async () => {
+  console.log('Попытка перехода на главную страницу...')
+
+  // Принудительно перезагружаем конфигурацию
+  await apiConfigStore.fetchConfig()
+
+  console.log('Текущая конфигурация после загрузки:', apiConfigStore.config)
+  console.log('Статус настройки:', apiConfigStore.isFullyConfigured)
+
+  if (!apiConfigStore.isFullyConfigured) {
+    alert('Настройте терминал')
+    console.log('Переход отклонен - терминал не настроен')
+    return
+  }
+
+  console.log('Переход разрешен - терминал настроен')
   router.push('/main')
 }
+
+// Загружаем конфигурацию при монтировании
+onMounted(async () => {
+  console.log('Greetings mounted - загружаем конфигурацию...')
+  await apiConfigStore.fetchConfig()
+  console.log('Конфигурация загружена:', apiConfigStore.config)
+})
 </script>
 
 <template>
@@ -15,7 +46,20 @@ const goToMainPage = () => {
     <div class="container">
       <h1 class="greetings">Добро пожаловать!</h1>
     </div>
-    <button class="start-button" @click="goToMainPage">Начать</button>
+
+    <!-- Индикатор состояния конфигурации -->
+    <div v-if="!apiConfigStore.isFullyConfigured" class="config-warning">
+      ⚠️ Терминал не настроен. Обратитесь к администратору.
+    </div>
+
+    <button
+      class="start-button"
+      @click="goToMainPage"
+      :disabled="!apiConfigStore.isFullyConfigured"
+      :class="{ disabled: !apiConfigStore.isFullyConfigured }"
+    >
+      Начать
+    </button>
   </main>
 </template>
 
@@ -63,6 +107,43 @@ main {
   cursor: pointer;
   padding: 0.5rem 1rem;
   margin-bottom: 2rem;
+  transition: all 0.3s ease;
+}
+
+.start-button.disabled {
+  background: #a0a0a0;
+  color: #666;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.start-button:not(.disabled):hover {
+  background: #c0c0c0;
+  transform: translateY(-2px);
+}
+
+.config-warning {
+  background: #fef3c7;
+  border: 2px solid #f59e0b;
+  border-radius: 15px;
+  padding: 1rem 2rem;
+  margin: 1rem;
+  color: #92400e;
+  font-size: clamp(1rem, 3vw, 1.5rem);
+  font-weight: 600;
+  text-align: center;
+  max-width: 600px;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
 }
 
 @media (max-width: 768px) {

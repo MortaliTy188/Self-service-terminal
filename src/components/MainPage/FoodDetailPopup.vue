@@ -1,5 +1,6 @@
 <script setup>
 import { ref } from 'vue'
+import { useOrdersStore } from '@/stores/orders'
 import placeholderImage from '@/assets/image 28.png'
 
 const props = defineProps({
@@ -15,6 +16,7 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'add-to-cart'])
 
+const ordersStore = useOrdersStore()
 const quantity = ref(1)
 
 const closePopup = () => {
@@ -32,15 +34,60 @@ const decreaseQuantity = () => {
   }
 }
 
-const addToCart = () => {
+const addToCart = async () => {
   if (props.item) {
-    emit('add-to-cart', { ...props.item, quantity: quantity.value })
-    closePopup()
+    try {
+      console.log('🎯 Добавляем товар в корзину:')
+      console.log('   Полные данные товара:', props.item)
+      console.log('   ID товара:', props.item.id)
+      console.log('   Количество:', quantity.value)
+
+      // Используем store для добавления товара в корзину через API
+      const result = await ordersStore.addToCartServer(props.item.id, quantity.value)
+
+      console.log('📦 Результат добавления через store:', result)
+
+      if (result.success) {
+        console.log('✅ Товар успешно добавлен в корзину через store')
+
+        // Эмитим событие об успешном добавлении
+        emit('add-to-cart', {
+          item: props.item,
+          quantity: quantity.value,
+          success: true,
+        })
+
+        closePopup()
+      } else {
+        throw new Error(result.error || 'Ошибка добавления товара')
+      }
+    } catch (error) {
+      console.error('❌ Ошибка добавления товара в корзину:', error)
+
+      // В случае ошибки можно попробовать добавить локально
+      ordersStore.addToCart(props.item, quantity.value)
+
+      emit('add-to-cart', {
+        item: props.item,
+        quantity: quantity.value,
+        success: false,
+        error: error.message,
+      })
+
+      closePopup()
+    }
   }
 }
 
 const handleImageError = (event) => {
   event.target.src = placeholderImage
+}
+
+const getCalories = (item) => {
+  if (!item) return '--- ккал'
+
+  const calories = item.energy_amount || item.energy_full_amount || item.calories
+  return calories && calories > 0 ? `${calories} ккал` : '--- ккал'
 }
 </script>
 
@@ -83,11 +130,31 @@ const handleImageError = (event) => {
         <div class="nutrition-info">
           <div class="nutrition-item">
             <span class="nutrition-label">Вес:</span>
-            <span class="nutrition-value">{{ item.weight || '250' }}г</span>
+            <span class="nutrition-value">
+              {{ item.weight && item.weight > 0 ? item.weight : '---' }}
+              {{ item.measure_unit || (item.weight && item.weight > 0 ? 'г' : '') }}
+            </span>
           </div>
           <div class="nutrition-item">
             <span class="nutrition-label">Калорийность:</span>
-            <span class="nutrition-value">{{ item.calories || '320' }} ккал</span>
+            <span class="nutrition-value">
+              {{ getCalories(item) }}
+            </span>
+          </div>
+          <div v-if="item.proteins_amount && item.proteins_amount > 0" class="nutrition-item">
+            <span class="nutrition-label">Белки:</span>
+            <span class="nutrition-value">{{ item.proteins_amount }}г</span>
+          </div>
+          <div v-if="item.fat_amount && item.fat_amount > 0" class="nutrition-item">
+            <span class="nutrition-label">Жиры:</span>
+            <span class="nutrition-value">{{ item.fat_amount }}г</span>
+          </div>
+          <div
+            v-if="item.carbohydrates_amount && item.carbohydrates_amount > 0"
+            class="nutrition-item"
+          >
+            <span class="nutrition-label">Углеводы:</span>
+            <span class="nutrition-value">{{ item.carbohydrates_amount }}г</span>
           </div>
         </div>
       </div>
@@ -236,9 +303,15 @@ const handleImageError = (event) => {
 }
 
 .nutrition-info {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 12px;
+}
+
+@media (max-width: 768px) {
+  .nutrition-info {
+    grid-template-columns: 1fr;
+  }
 }
 
 .nutrition-item {

@@ -4,11 +4,27 @@
     <div class="container-right">
       <!-- Вкладка заказов -->
       <template v-if="activeTab === 'orders'">
-        <OrderFilters
-          :active-filter="activeFilter"
-          :filters="orderFilters"
-          @filter-change="setFilter"
-        />
+        <div class="orders-controls">
+          <OrderFilters
+            :active-filter="activeFilter"
+            :filters="orderFilters"
+            @filter-change="setFilter"
+          />
+          <div class="table-search">
+            <input
+              v-model="tableSearchInput"
+              type="number"
+              placeholder="Поиск по столу..."
+              class="table-search-input"
+              @input="handleTableSearch"
+              min="1"
+              max="99"
+            />
+            <button v-if="tableSearchInput" @click="clearTableSearch" class="clear-search-btn">
+              ✕
+            </button>
+          </div>
+        </div>
         <OrdersTable :orders="filteredOrders" :is-loading="isLoading" :error="error" />
       </template>
 
@@ -62,7 +78,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
-import { useOrdersStore, useWaiterStore, useMenuStore } from '@/stores'
+import { useOrdersStore, useWaiterStore, useMenuStore, useApiConfigStore } from '@/stores'
 import {
   LeftSidebar,
   OrderFilters,
@@ -77,11 +93,13 @@ import {
 const ordersStore = useOrdersStore()
 const waiterStore = useWaiterStore()
 const menuStore = useMenuStore()
+const apiConfigStore = useApiConfigStore()
 
 // Данные из stores
 const orders = computed(() => ordersStore.orders)
 const isLoading = computed(() => ordersStore.isLoading)
 const error = computed(() => ordersStore.error)
+const isFiltered = computed(() => ordersStore.isFiltered)
 
 const menuItems = computed(() => menuStore.menuItems)
 const isMenuLoading = computed(() => menuStore.isLoading)
@@ -97,43 +115,65 @@ const activeTab = ref('orders')
 const activeFilter = ref('all')
 const activeMenuFilter = ref('all')
 
+// Поиск по номеру стола
+const tableSearchInput = ref('')
+
 // Конфигурация фильтров для переиспользуемого компонента
 const orderFilters = computed(() => {
   const items = orders.value || []
+
+  // Если данные отфильтрованы на сервере, не показываем точные счетчики для других фильтров
+  const showExactCounts = !isFiltered.value
 
   return [
     {
       value: 'all',
       label: 'Все заказы',
       icon: '📋',
-      count: items.length,
+      count: showExactCounts ? items.length : '?',
     },
     {
       value: 'preparing',
       label: 'Готовится',
       icon: '👨‍🍳',
-      count: items.filter((order) => order.status === 'preparing').length,
+      count: showExactCounts
+        ? items.filter((order) => order.status === 'preparing').length
+        : activeFilter.value === 'preparing'
+          ? items.length
+          : '?',
       class: { 'status-preparing': true },
     },
     {
       value: 'ready',
       label: 'Готов к выдаче',
       icon: '🔔',
-      count: items.filter((order) => order.status === 'ready').length,
+      count: showExactCounts
+        ? items.filter((order) => order.status === 'ready').length
+        : activeFilter.value === 'ready'
+          ? items.length
+          : '?',
       class: { 'status-ready': true },
     },
     {
       value: 'completed',
       label: 'Выполненные',
       icon: '✅',
-      count: items.filter((order) => order.status === 'completed').length,
+      count: showExactCounts
+        ? items.filter((order) => order.status === 'completed').length
+        : activeFilter.value === 'completed'
+          ? items.length
+          : '?',
       class: { 'status-completed': true },
     },
     {
       value: 'cancelled',
       label: 'Отменённые',
       icon: '❌',
-      count: items.filter((order) => order.status === 'cancelled').length,
+      count: showExactCounts
+        ? items.filter((order) => order.status === 'cancelled').length
+        : activeFilter.value === 'cancelled'
+          ? items.length
+          : '?',
       class: { 'status-cancelled': true },
     },
   ]
@@ -188,12 +228,40 @@ const showNotificationPopup = ref(false)
 const currentNotification = ref({})
 
 // Функции для смены фильтров
-const setFilter = (filter) => {
+const setFilter = async (filter) => {
   activeFilter.value = filter
+  // Фильтрация теперь только локальная через computed свойство filteredOrders
+  // Не загружаем данные с сервера при смене фильтра
 }
 
 const setMenuFilter = (filter) => {
   activeMenuFilter.value = filter
+}
+
+// Функции поиска по номеру стола
+const handleTableSearch = async () => {
+  if (tableSearchInput.value) {
+    try {
+      console.log('🔍 Поиск заказов по столу:', tableSearchInput.value)
+      await ordersStore.fetchOrdersByTable(tableSearchInput.value)
+      // Сбрасываем активный фильтр при поиске по столу
+      activeFilter.value = 'all'
+    } catch (error) {
+      console.error('Ошибка поиска по столу:', error)
+      // При ошибке показываем все заказы
+      await ordersStore.fetchOrders()
+    }
+  } else {
+    // Если поле очищено, показываем все заказы
+    await ordersStore.fetchOrders()
+    activeFilter.value = 'all'
+  }
+}
+
+const clearTableSearch = async () => {
+  tableSearchInput.value = ''
+  activeFilter.value = 'all'
+  await ordersStore.fetchOrders()
 }
 
 // Функция для смены вкладки
@@ -209,6 +277,12 @@ const handleTabChange = (tab) => {
 // Отфильтрованные заказы
 const filteredOrders = computed(() => {
   const items = orders.value || []
+  console.log('🔍 Фильтрация заказов:', {
+    totalOrders: items.length,
+    activeFilter: activeFilter.value,
+    firstOrder: items[0],
+  })
+
   if (activeFilter.value === 'all') {
     return items
   }
@@ -415,7 +489,7 @@ const handleUpdateConnectionKey = (deviceId, newKey) => {
 }
 
 // Функции для работы с настройками
-const handleSaveSettings = (settingsData) => {
+const handleSaveSettings = async (settingsData) => {
   console.log('Сохранение настроек:', settingsData)
   // Здесь будет API вызов для сохранения настроек системы
   // В зависимости от типа настроек (account, api, splash)
@@ -426,7 +500,8 @@ const handleSaveSettings = (settingsData) => {
       break
     case 'api':
       console.log('Сохранение настроек API:', settingsData.data)
-      // await saveApiSettings(settingsData.data)
+      // Перезагружаем конфигурацию после сохранения
+      await apiConfigStore.fetchConfig()
       break
     case 'splash':
       console.log('Сохранение настроек заставки:', settingsData.data)
@@ -441,6 +516,9 @@ onMounted(async () => {
   await menuStore.fetchMenuWithCategories()
   await ordersStore.fetchOrders()
   await waiterStore.fetchNotifications()
+
+  // Загружаем API конфигурацию
+  await apiConfigStore.fetchConfig()
 
   // Проверяем, есть ли неразрешенные уведомления при загрузке
   const activeNotifications = notifications.value.filter((n) => !n.resolved)
@@ -506,5 +584,63 @@ onMounted(async () => {
 .placeholder p {
   font-size: 16px;
   margin: 0;
+}
+
+/* Стили для контролов заказов */
+.orders-controls {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.table-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.table-search-input {
+  padding: 8px 12px;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 14px;
+  width: 180px;
+  transition: border-color 0.2s;
+}
+
+.table-search-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+}
+
+.table-search-input::-webkit-outer-spin-button,
+.table-search-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.table-search-input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.clear-search-btn {
+  position: absolute;
+  right: 8px;
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  color: #6b7280;
+  padding: 2px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.clear-search-btn:hover {
+  background-color: #f3f4f6;
+  color: #374151;
 }
 </style>

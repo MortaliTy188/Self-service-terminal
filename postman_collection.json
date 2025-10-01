@@ -1,0 +1,865 @@
+{
+	"info": {
+		"_postman_id": "restaurant-selforde-api",
+		"name": "Restaurant Self-Order API",
+		"description": "API тесты для системы самообслуживания ресторана",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Health Check",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/health",
+					"host": ["{{baseUrl}}"],
+					"path": ["health"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Menu Management",
+			"item": [
+				{
+					"name": "Get Menu",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/menu",
+							"host": ["{{baseUrl}}"],
+							"path": ["menu"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Menu by Category",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/menu?category_id=cat_1",
+							"host": ["{{baseUrl}}"],
+							"path": ["menu"],
+							"query": [
+								{
+									"key": "category_id",
+									"value": "cat_1"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Menu Item",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Борщ украинский\",\n    \"price\": 350,\n    \"image\": \"https://images.unsplash.com/photo-1547592166-23ac45744acd?w=300\",\n    \"category_id\": \"cat_1\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/menu",
+							"host": ["{{baseUrl}}"],
+							"path": ["menu"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Menu Item",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Борщ украинский (обновленный)\",\n    \"price\": 380,\n    \"image\": \"https://images.unsplash.com/photo-1547592166-23ac45744acd?w=300\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/menu/{{menuItemId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["menu", "{{menuItemId}}"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Menu Item",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/menu/{{menuItemId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["menu", "{{menuItemId}}"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Upload Menu (Bulk)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "[\n    {\n        \"id\": \"menu_test_1\",\n        \"name\": \"Пицца Маргарита\",\n        \"price\": 450,\n        \"image\": \"https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=300\",\n        \"category_id\": \"cat_1\"\n    },\n    {\n        \"id\": \"menu_test_2\",\n        \"name\": \"Паста Карбонара\",\n        \"price\": 380,\n        \"image\": \"https://images.unsplash.com/photo-1621996346565-e3dbc353d2e5?w=300\",\n        \"category_id\": \"cat_1\"\n    }\n]"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/menu/upload",
+							"host": ["{{baseUrl}}"],
+							"path": ["menu", "upload"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Categories Management",
+			"item": [
+				{
+					"name": "Get Categories",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/categories",
+							"host": ["{{baseUrl}}"],
+							"path": ["categories"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Category",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Основные блюда\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/categories",
+							"host": ["{{baseUrl}}"],
+							"path": ["categories"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Category",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Горячие блюда\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/categories/{{categoryId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["categories", "{{categoryId}}"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Category",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/categories/{{categoryId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["categories", "{{categoryId}}"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Cart Management",
+			"item": [
+				{
+					"name": "Get Cart",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/cart",
+							"host": ["{{baseUrl}}"],
+							"path": ["cart"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Add to Cart",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"menu_item_id\": \"menu_test_1\",\n    \"qty\": 2\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/cart/add",
+							"host": ["{{baseUrl}}"],
+							"path": ["cart", "add"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Remove from Cart",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"menu_item_id\": \"menu_test_1\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/cart/remove",
+							"host": ["{{baseUrl}}"],
+							"path": ["cart", "remove"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Checkout",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"order_id\": \"ord_{{$timestamp}}\",\n    \"table_number\": 5\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/cart/checkout",
+							"host": ["{{baseUrl}}"],
+							"path": ["cart", "checkout"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Orders Management",
+			"item": [
+				{
+					"name": "Get All Orders",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/orders",
+							"host": ["{{baseUrl}}"],
+							"path": ["orders"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Orders by Status",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/orders?status=pending",
+							"host": ["{{baseUrl}}"],
+							"path": ["orders"],
+							"query": [
+								{
+									"key": "status",
+									"value": "pending"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Orders by Table",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/orders?table_number=5",
+							"host": ["{{baseUrl}}"],
+							"path": ["orders"],
+							"query": [
+								{
+									"key": "table_number",
+									"value": "5"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Orders with Pagination",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/orders?limit=10&offset=0",
+							"host": ["{{baseUrl}}"],
+							"path": ["orders"],
+							"query": [
+								{
+									"key": "limit",
+									"value": "10"
+								},
+								{
+									"key": "offset",
+									"value": "0"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Order Status - Ready",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"status\": \"ready\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/orders/{{orderId}}/status",
+							"host": ["{{baseUrl}}"],
+							"path": ["orders", "{{orderId}}", "status"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Order Status - Completed",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"status\": \"completed\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/orders/{{orderId}}/status",
+							"host": ["{{baseUrl}}"],
+							"path": ["orders", "{{orderId}}", "status"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Order Status - Cancelled",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"status\": \"cancelled\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/orders/{{orderId}}/status",
+							"host": ["{{baseUrl}}"],
+							"path": ["orders", "{{orderId}}", "status"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Admin Authentication",
+			"item": [
+				{
+					"name": "Admin Verify - Valid Key",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"adminKey\": \"admin123\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/admin/verify",
+							"host": ["{{baseUrl}}"],
+							"path": ["admin", "verify"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Admin Verify - Invalid Key",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"adminKey\": \"invalid-key\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/admin/verify",
+							"host": ["{{baseUrl}}"],
+							"path": ["admin", "verify"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Admin Verify - terminal-admin",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"adminKey\": \"terminal-admin\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/admin/verify",
+							"host": ["{{baseUrl}}"],
+							"path": ["admin", "verify"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Admin Verify - management-key",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"adminKey\": \"management-key\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/admin/verify",
+							"host": ["{{baseUrl}}"],
+							"path": ["admin", "verify"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Validate Session - Valid",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"sessionId\": \"{{sessionId}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/admin/validate-session",
+							"host": ["{{baseUrl}}"],
+							"path": ["admin", "validate-session"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Validate Session - Invalid",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"sessionId\": \"invalid-session-id\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/admin/validate-session",
+							"host": ["{{baseUrl}}"],
+							"path": ["admin", "validate-session"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Admin Legacy",
+			"item": [
+				{
+					"name": "Admin Login (Legacy)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"username\": \"admin\",\n    \"password\": \"resapi\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/admin/login",
+							"host": ["{{baseUrl}}"],
+							"path": ["admin", "login"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Admin Orders",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/admin/orders",
+							"host": ["{{baseUrl}}"],
+							"path": ["admin", "orders"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Admin Menu",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/admin/menu",
+							"host": ["{{baseUrl}}"],
+							"path": ["admin", "menu"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Order Items",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/admin/order_items?order_id={{orderId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["admin", "order_items"],
+							"query": [
+								{
+									"key": "order_id",
+									"value": "{{orderId}}"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Table Management",
+			"item": [
+				{
+					"name": "Get All Tables",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/tables",
+							"host": ["{{baseUrl}}"],
+							"path": ["tables"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Sync Tables from iiko",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/tables/sync",
+							"host": ["{{baseUrl}}"],
+							"path": ["tables", "sync"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Table by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/tables/{{tableId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["tables", "{{tableId}}"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Table Mapping",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/tables/mapping/{{tableId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["tables", "mapping", "{{tableId}}"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Tables Status",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/tables/status",
+							"host": ["{{baseUrl}}"],
+							"path": ["tables", "status"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Order with Table ID",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"order_id\": \"ord_{{$timestamp}}\",\n  \"table_number\": 5,\n  \"table_id\": \"1\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/cart/checkout",
+							"host": ["{{baseUrl}}"],
+							"path": ["cart", "checkout"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "API Configuration",
+			"item": [
+				{
+					"name": "Get Current API Config",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/config",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "config"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Set API Configuration",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"api_login\": \"api_login_12345\",\n  \"organization_id\": \"fb180a98-1352-480b-916f-8dddde866f3c\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/config",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "config"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Set Extended API Configuration",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"api_login\": \"89c6102cdede43f8a17dd397a2670d94\",\n  \"organization_id\": \"fb180a98-1352-480b-916f-8dddde866f3c\",\n  \"terminal_group_id\": \"b233cacb-c4ab-fa4b-0199-56337bcb0066\",\n  \"payment_type_id\": \"09322f46-578a-d210-add7-eec222a08871\",\n  \"table_id\": \"291dd02b-eafe-4ea6-86f5-c4f3ca0043aa\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/config/extended",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "config", "extended"]
+						}
+					},
+					"response": [],
+					"description": "Настроить все параметры iiko API включая терминальные группы"
+				},
+				{
+					"name": "Test iiko Connection",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/test-connection",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "test-connection"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Terminal Groups",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/terminal-groups",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "terminal-groups"]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8080",
+			"type": "string"
+		},
+		{
+			"key": "menuItemId", 
+			"value": "menu_test_1",
+			"type": "string"
+		},
+		{
+			"key": "categoryId",
+			"value": "cat_1",
+			"type": "string"
+		},
+		{
+			"key": "orderId",
+			"value": "ord_1234567890",
+			"type": "string"
+		},
+		{
+			"key": "sessionId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "tableId",
+			"value": "1",
+			"type": "string"
+		}
+	]
+}

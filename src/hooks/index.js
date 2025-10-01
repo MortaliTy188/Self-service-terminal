@@ -1,5 +1,6 @@
 // Остальные хуки
 export { useSplashSettings } from './useSplashSettings.js'
+export { useAdminAuth } from './useAdminAuth.js'
 
 // Прямой доступ к stores
 export {
@@ -9,6 +10,7 @@ export {
   useOrdersStore,
   useSettingsStore,
   useWaiterStore,
+  useApiConfigStore,
 } from '@/stores'
 
 // API клиент

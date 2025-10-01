@@ -1,5 +1,4 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { useAuthStore } from '@/stores'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -24,10 +23,12 @@ const router = createRouter({
 })
 
 // Глобальный навигационный гард для защищенных маршрутов
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   if (to.meta.requiresAuth) {
-    const authStore = useAuthStore()
-    const authResult = authStore.checkAdminAccess()
+    // Импортируем useAdminAuth динамически внутри функции
+    const { useAdminAuth } = await import('@/hooks')
+    const { requestAdminAccess } = useAdminAuth()
+    const authResult = await requestAdminAccess()
 
     if (!authResult.success) {
       if (authResult.cancelled) {

@@ -106,71 +106,98 @@
 
         <div class="popup-content">
           <div class="form-section">
-            <h3>Основные настройки</h3>
+            <h3>Основные настройки iiko API</h3>
             <div class="form-group">
-              <label for="apiUrl">URL сервера</label>
+              <label for="apiLogin">API Login</label>
               <input
-                id="apiUrl"
-                v-model="apiSettings.serverUrl"
+                id="apiLogin"
+                v-model="apiConfig.api_login"
                 type="text"
                 class="form-input"
-                placeholder="http://83.222.9.90:8080"
+                placeholder="89c6102cdede43f8a17dd397a2670d94"
               />
             </div>
             <div class="form-group">
-              <label for="apiKey">API ключ</label>
+              <label for="organizationId">Organization ID</label>
               <input
-                id="apiKey"
-                v-model="apiSettings.apiKey"
+                id="organizationId"
+                v-model="apiConfig.organization_id"
                 type="text"
                 class="form-input"
-                placeholder="your-api-key-here"
+                placeholder="fb180a98-1352-480b-916f-8dddde866f3c"
               />
             </div>
           </div>
 
           <div class="form-section">
-            <h3>Таймауты и интервалы</h3>
+            <h3>Терминал и платежи</h3>
             <div class="form-group">
-              <label for="requestTimeout">Таймаут запросов (сек)</label>
+              <label for="terminalGroupId">Terminal Group ID</label>
               <input
-                id="requestTimeout"
-                v-model="apiSettings.requestTimeout"
-                type="number"
+                id="terminalGroupId"
+                v-model="apiConfig.terminal_group_id"
+                type="text"
                 class="form-input"
-                placeholder="30"
+                placeholder="b233cacb-c4ab-fa4b-0199-56337bcb0066"
               />
             </div>
             <div class="form-group">
-              <label for="syncInterval">Интервал синхронизации (сек)</label>
+              <label for="paymentTypeId">Payment Type ID</label>
               <input
-                id="syncInterval"
-                v-model="apiSettings.syncInterval"
-                type="number"
+                id="paymentTypeId"
+                v-model="apiConfig.payment_type_id"
+                type="text"
                 class="form-input"
-                placeholder="300"
+                placeholder="09322f46-578a-d210-add7-eec222a08871"
+              />
+            </div>
+            <div class="form-group">
+              <label for="tableId">Table ID</label>
+              <input
+                id="tableId"
+                v-model="apiConfig.table_id"
+                type="text"
+                class="form-input"
+                placeholder="291dd02b-eafe-4ea6-86f5-c4f3ca0043aa"
               />
             </div>
           </div>
 
           <div class="connection-status">
-            <div class="status-indicator" :class="{ online: isConnected }"></div>
+            <div
+              class="status-indicator"
+              :class="{
+                online: !apiConfigStore.error && apiConfigStore.isFullyConfigured,
+                error: apiConfigStore.error,
+                warning: !apiConfigStore.isFullyConfigured,
+              }"
+            ></div>
             <span class="status-text">
-              {{ isConnected ? 'Соединение установлено' : 'Нет соединения' }}
+              <template v-if="apiConfigStore.error"> Ошибка: {{ apiConfigStore.error }} </template>
+              <template v-else-if="!apiConfigStore.isFullyConfigured">
+                Конфигурация не завершена
+              </template>
+              <template v-else> Конфигурация настроена </template>
             </span>
             <button
               class="test-btn"
-              @click="testConnection"
-              :disabled="isTestingConnection"
-              :class="{ testing: isTestingConnection }"
+              @click="testApiConnection"
+              :disabled="apiConfigStore.isLoading"
+              :class="{ testing: apiConfigStore.isLoading }"
             >
-              {{ isTestingConnection ? 'Проверяем...' : 'Проверить соединение' }}
+              {{ apiConfigStore.isLoading ? 'Проверяем...' : 'Проверить соединение' }}
             </button>
           </div>
 
           <div class="popup-actions">
             <button class="btn-cancel" @click="closeApiPopup">Отмена</button>
-            <button class="btn-save" @click="saveApiSettings">Сохранить</button>
+            <button
+              class="btn-save"
+              @click="saveApiConfiguration"
+              :disabled="apiConfigStore.isLoading"
+            >
+              {{ apiConfigStore.isLoading ? 'Сохранение...' : 'Сохранить' }}
+            </button>
           </div>
         </div>
       </div>
@@ -248,12 +275,16 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useSplashSettings } from '@/hooks'
-import { useSettingsStore } from '@/stores'
+import { useSettingsStore, useApiConfigStore } from '@/stores'
 import placeholderImageSrc from '@/assets/mainBackground.png'
 
 const emit = defineEmits(['save-settings'])
+
+// Stores
+const settingsStore = useSettingsStore()
+const apiConfigStore = useApiConfigStore()
 
 // Хук для управления настройками заставки
 const {
@@ -263,22 +294,15 @@ const {
   updateShowOnStartup,
 } = useSplashSettings()
 
-// Settings store для прямого доступа к функциям
-const settingsStore = useSettingsStore()
-
 // Состояния попапов
 const showAccountPopup = ref(false)
 const showApiPopup = ref(false)
 const showSplashPopup = ref(false)
 
-// Состояние подключения
-const isConnected = ref(false)
-const isTestingConnection = ref(false)
-
 // Ссылка на input файла
 const fileInput = ref(null)
 
-// Placeholder для изображения - используем стандартное изображение заставки
+// Placeholder для изображения
 const placeholderImage = placeholderImageSrc
 
 // Настройки аккаунта
@@ -288,12 +312,13 @@ const accountSettings = ref({
   waiterCode: '1234',
 })
 
-// Настройки API
-const apiSettings = ref({
-  serverUrl: 'http://83.222.9.90:8080',
-  apiKey: '',
-  requestTimeout: 30,
-  syncInterval: 300,
+// Локальная копия API конфигурации для редактирования
+const apiConfig = ref({
+  api_login: '',
+  organization_id: '',
+  terminal_group_id: '',
+  payment_type_id: '',
+  table_id: '',
 })
 
 // Настройки заставки
@@ -308,7 +333,10 @@ const openAccountSettings = () => {
   showAccountPopup.value = true
 }
 
-const openApiSettings = () => {
+const openApiSettings = async () => {
+  // Загружаем текущую конфигурацию при открытии
+  await apiConfigStore.fetchConfig()
+  apiConfig.value = { ...apiConfigStore.config }
   showApiPopup.value = true
 }
 
@@ -335,6 +363,7 @@ const closeAccountPopup = () => {
 
 const closeApiPopup = () => {
   showApiPopup.value = false
+  apiConfigStore.clearError()
 }
 
 const closeSplashPopup = () => {
@@ -349,11 +378,36 @@ const saveAccountSettings = () => {
   closeAccountPopup()
 }
 
-const saveApiSettings = () => {
-  console.log('Сохранение настроек API:', apiSettings.value)
-  // Здесь будет API вызов для сохранения настроек API
-  emit('save-settings', { type: 'api', data: apiSettings.value })
-  closeApiPopup()
+const saveApiConfiguration = async () => {
+  try {
+    const result = await apiConfigStore.saveExtendedConfig(apiConfig.value)
+
+    if (result.success) {
+      alert(result.message || 'Конфигурация API успешно сохранена!')
+      closeApiPopup()
+      emit('save-settings', { type: 'api', data: result.data })
+    } else {
+      alert(`Ошибка сохранения: ${result.error}`)
+    }
+  } catch (error) {
+    console.error('Ошибка сохранения API конфигурации:', error)
+    alert('Произошла ошибка при сохранении конфигурации')
+  }
+}
+
+const testApiConnection = async () => {
+  try {
+    const result = await apiConfigStore.testConnection()
+
+    if (result.success) {
+      alert('Соединение с API успешно установлено!')
+    } else {
+      alert(`Ошибка подключения: ${result.error}`)
+    }
+  } catch (error) {
+    console.error('Ошибка тестирования соединения:', error)
+    alert('Произошла ошибка при тестировании подключения')
+  }
 }
 
 const saveSplashSettings = () => {
@@ -376,88 +430,6 @@ const saveSplashSettings = () => {
   closeSplashPopup()
 }
 
-// Функция тестирования соединения
-const testConnection = async () => {
-  try {
-    console.log('Тестирование соединения с:', apiSettings.value.serverUrl)
-
-    if (!apiSettings.value.serverUrl) {
-      throw new Error('URL сервера не указан')
-    }
-
-    // Показываем состояние загрузки
-    isTestingConnection.value = true
-
-    // Реальная проверка соединения
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), apiSettings.value.requestTimeout * 1000)
-
-    const response = await fetch('/api/health', {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(apiSettings.value.apiKey && { Authorization: `Bearer ${apiSettings.value.apiKey}` }),
-      },
-      signal: controller.signal,
-    })
-
-    clearTimeout(timeoutId)
-
-    if (response.ok) {
-      isConnected.value = true
-      console.log('Соединение установлено успешно')
-
-      // Попробуем также проверить основные эндпоинты
-      const endpoints = ['/categories', '/menu']
-      const endpointChecks = await Promise.allSettled(
-        endpoints.map((endpoint) =>
-          fetch(`${apiSettings.value.serverUrl}${endpoint}`, {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              ...(apiSettings.value.apiKey && {
-                Authorization: `Bearer ${apiSettings.value.apiKey}`,
-              }),
-            },
-            signal: AbortSignal.timeout(5000), // 5 секунд таймаут для каждого эндпоинта
-          }),
-        ),
-      )
-
-      const workingEndpoints = endpointChecks.filter(
-        (result) => result.status === 'fulfilled' && result.value.ok,
-      ).length
-
-      console.log(`Работает ${workingEndpoints} из ${endpoints.length} эндпоинтов`)
-
-      // Показываем успешное уведомление
-      alert(
-        `Соединение установлено! Работает ${workingEndpoints} из ${endpoints.length} эндпоинтов API`,
-      )
-    } else {
-      throw new Error(`Сервер вернул ошибку: ${response.status} ${response.statusText}`)
-    }
-  } catch (error) {
-    console.error('Ошибка при проверке соединения:', error)
-    isConnected.value = false
-
-    // Показываем конкретную ошибку пользователю
-    let errorMessage = 'Не удалось подключиться к серверу'
-    if (error.name === 'AbortError') {
-      errorMessage = 'Превышено время ожидания соединения'
-    } else if (error.message.includes('Failed to fetch')) {
-      errorMessage = 'Сервер недоступен или неверный URL'
-    } else if (error.message) {
-      errorMessage = error.message
-    }
-
-    alert(`Ошибка подключения: ${errorMessage}`)
-  } finally {
-    // Убираем состояние загрузки
-    isTestingConnection.value = false
-  }
-}
-
 // Функции для работы с файлами
 const triggerFileUpload = () => {
   fileInput.value?.click()
@@ -475,9 +447,10 @@ const handleImageUpload = (event) => {
 }
 
 // Инициализация
-onMounted(() => {
+onMounted(async () => {
   console.log('SettingsManagement mounted')
-  // Здесь можно загрузить сохраненные настройки
+  // Загружаем текущую API конфигурацию
+  await apiConfigStore.fetchConfig()
 })
 </script>
 
@@ -705,10 +678,19 @@ onMounted(() => {
   height: 12px;
   border-radius: 50%;
   background: #dc2626;
+  transition: background 0.2s;
 }
 
 .status-indicator.online {
   background: #16a34a;
+}
+
+.status-indicator.warning {
+  background: #f59e0b;
+}
+
+.status-indicator.error {
+  background: #dc2626;
 }
 
 .status-text {
@@ -727,8 +709,19 @@ onMounted(() => {
   transition: background 0.2s;
 }
 
-.test-btn:hover {
+.test-btn:hover:not(:disabled) {
   background: #e5e7eb;
+}
+
+.test-btn:disabled {
+  background: #f9fafb;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.test-btn.testing {
+  background: #dbeafe;
+  color: #1d4ed8;
 }
 
 .test-btn:disabled {
@@ -881,8 +874,14 @@ onMounted(() => {
   color: white;
 }
 
-.btn-save:hover {
+.btn-save:hover:not(:disabled) {
   background: #15803d;
+}
+
+.btn-save:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 @media (max-width: 768px) {
