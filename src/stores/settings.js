@@ -1,8 +1,11 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { useApiConfigStore } from './apiConfig'
 import defaultSplashImage from '@/assets/mainBackground.png'
 
 export const useSettingsStore = defineStore('settings', () => {
+  const apiConfigStore = useApiConfigStore()
+  
   // State
   const splashSettings = ref({
     currentImage: '',
@@ -11,12 +14,14 @@ export const useSettingsStore = defineStore('settings', () => {
   })
 
   const apiSettings = ref({
-    serverUrl: 'http://83.222.9.90:8080',
     apiKey: '',
     requestTimeout: 30,
     syncInterval: 300,
     isConnected: false,
   })
+
+  // Computed property для динамического URL
+  const serverUrl = computed(() => apiConfigStore.baseUrl)
 
   const systemSettings = ref({
     language: 'ru',
@@ -324,6 +329,7 @@ export const useSettingsStore = defineStore('settings', () => {
     apiSettings,
     systemSettings,
     deviceSettings,
+    serverUrl,
 
     // Getters
     backgroundImage,

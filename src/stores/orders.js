@@ -2,9 +2,11 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useMainStore } from './main'
 import { useMenuStore } from './menu'
+import { useApiConfigStore } from './apiConfig'
 
 export const useOrdersStore = defineStore('orders', () => {
   const mainStore = useMainStore()
+  const apiConfigStore = useApiConfigStore()
 
   // Получаем доступ к menuStore для поиска информации о товарах
   const getMenuStore = () => {
@@ -78,7 +80,7 @@ export const useOrdersStore = defineStore('orders', () => {
 
     try {
       // Формируем URL с параметрами фильтрации
-      let url = 'http://localhost:8080/orders'
+      let url = `${apiConfigStore.baseUrl}/orders`
       const queryParams = []
 
       if (filters.status) {
@@ -236,7 +238,7 @@ export const useOrdersStore = defineStore('orders', () => {
       console.log('📤 Отправляем на сервер:', requestBody)
       console.log('📤 JSON строка:', JSON.stringify(requestBody))
 
-      const response = await fetch('http://localhost:8080/cart/add', {
+      const response = await fetch(`${apiConfigStore.baseUrl}/cart/add`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -338,7 +340,7 @@ export const useOrdersStore = defineStore('orders', () => {
 
       console.log('🗑️ Удаляем товар из корзины через API:', requestBody)
 
-      const response = await fetch('http://localhost:8080/cart/remove', {
+      const response = await fetch(`${apiConfigStore.baseUrl}/cart/remove`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -461,8 +463,8 @@ export const useOrdersStore = defineStore('orders', () => {
 
   const fetchCart = async () => {
     try {
-      console.log('🛒 Загружаем корзину с сервера: http://localhost:8080/cart')
-      const response = await fetch('http://localhost:8080/cart')
+      console.log(`🛒 Загружаем корзину с сервера: ${apiConfigStore.baseUrl}/cart`)
+      const response = await fetch(`${apiConfigStore.baseUrl}/cart`)
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
@@ -507,7 +509,7 @@ export const useOrdersStore = defineStore('orders', () => {
 
       console.log('🛒 Создаем заказ через API:', requestBody)
 
-      const response = await fetch('http://localhost:8080/cart/checkout', {
+      const response = await fetch(`${apiConfigStore.baseUrl}/cart/checkout`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

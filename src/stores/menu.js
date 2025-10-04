@@ -1,9 +1,11 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useMainStore } from './main'
+import { useApiConfigStore } from './apiConfig'
 
 export const useMenuStore = defineStore('menu', () => {
   const mainStore = useMainStore()
+  const apiConfigStore = useApiConfigStore()
 
   // State
   const menuItems = ref([])
@@ -37,8 +39,8 @@ export const useMenuStore = defineStore('menu', () => {
     error.value = null
 
     try {
-      console.log('🍽️ Загружаем меню с сервера: http://localhost:8080/menu')
-      const response = await fetch('http://localhost:8080/menu')
+      console.log('🍽️ Загружаем меню с сервера:', `${apiConfigStore.baseUrl}/menu`)
+      const response = await fetch(`${apiConfigStore.baseUrl}/menu`)
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
@@ -47,7 +49,7 @@ export const useMenuStore = defineStore('menu', () => {
       const data = await response.json()
       menuItems.value = data
       console.log('✅ Меню успешно загружено с сервера:', {
-        source: 'http://localhost:8080/menu',
+        source: `${apiConfigStore.baseUrl}/menu`,
         itemsCount: data.length,
         items: data,
       })
@@ -62,8 +64,8 @@ export const useMenuStore = defineStore('menu', () => {
 
   const fetchCategories = async () => {
     try {
-      console.log('📂 Загружаем категории с сервера: http://localhost:8080/categories')
-      const response = await fetch('http://localhost:8080/categories')
+      console.log('📂 Загружаем категории с сервера:', `${apiConfigStore.baseUrl}/categories`)
+      const response = await fetch(`${apiConfigStore.baseUrl}/categories`)
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
@@ -72,7 +74,7 @@ export const useMenuStore = defineStore('menu', () => {
       const data = await response.json()
       categories.value = data
       console.log('✅ Категории успешно загружены с сервера:', {
-        source: 'http://localhost:8080/categories',
+        source: `${apiConfigStore.baseUrl}/categories`,
         categoriesCount: data.length,
         categories: data,
       })

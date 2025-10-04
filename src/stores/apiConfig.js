@@ -14,11 +14,30 @@ export const useApiConfigStore = defineStore('apiConfig', () => {
   const isLoading = ref(false)
   const error = ref(null)
   const lastUpdated = ref(null)
-
+  
+  // Режимы работы
+  const serverMode = ref('local') // 'local' или 'public'
+  
   // Constants
-  const BASE_URL = 'http://localhost:8080'
+  const SERVER_CONFIGS = {
+    local: {
+      url: 'http://localhost:8080',
+      name: 'Локальный сервер'
+    },
+    public: {
+      url: 'http://83.222.9.90:8081',
+      name: 'Публичный сервер'
+    }
+  }
 
   // Getters
+  const currentServerConfig = computed(() => {
+    return SERVER_CONFIGS[serverMode.value] || SERVER_CONFIGS.local
+  })
+  
+  const baseUrl = computed(() => {
+    return currentServerConfig.value.url
+  })
   const isConfigured = computed(() => {
     return (
       config.value.api_login &&
@@ -38,13 +57,45 @@ export const useApiConfigStore = defineStore('apiConfig', () => {
   })
 
   // Actions
+  const switchServerMode = (mode) => {
+    if (SERVER_CONFIGS[mode]) {
+      serverMode.value = mode
+      console.log(`🔄 Переключено на ${SERVER_CONFIGS[mode].name}: ${SERVER_CONFIGS[mode].url}`)
+      
+      // Сохраняем выбор в localStorage
+      localStorage.setItem('serverMode', mode)
+    }
+  }
+  
+  const loadServerMode = async () => {
+    // Сначала проверяем переменные окружения (из .env.local)
+    const envMode = import.meta.env.VITE_SERVER_MODE
+    const envUrl = import.meta.env.VITE_SERVER_URL
+    const envName = import.meta.env.VITE_SERVER_NAME
+    
+    if (envMode && SERVER_CONFIGS[envMode]) {
+      serverMode.value = envMode
+      console.log(`📂 Загружен режим из переменных окружения: ${envName || SERVER_CONFIGS[envMode].name} (${envUrl || SERVER_CONFIGS[envMode].url})`)
+      return
+    }
+    
+    // Если переменные окружения не установлены, используем localStorage
+    const savedMode = localStorage.getItem('serverMode')
+    if (savedMode && SERVER_CONFIGS[savedMode]) {
+      serverMode.value = savedMode
+      console.log(`📂 Загружен режим из localStorage: ${SERVER_CONFIGS[savedMode].name}`)
+    } else {
+      console.log(`📂 Использован режим по умолчанию: ${SERVER_CONFIGS.local.name}`)
+    }
+  }
+  
   const fetchConfig = async () => {
     isLoading.value = true
     error.value = null
 
     try {
       console.log('Запрашиваем конфигурацию с сервера...')
-      const response = await fetch(`${BASE_URL}/api/config`)
+      const response = await fetch(`${baseUrl.value}/api/config`)
 
       if (!response.ok) {
         if (response.status === 404) {
@@ -114,7 +165,7 @@ export const useApiConfigStore = defineStore('apiConfig', () => {
 
     try {
       console.log('Сохраняем конфигурацию:', configData)
-      const response = await fetch(`${BASE_URL}/api/config/extended`, {
+      const response = await fetch(`${baseUrl.value}/api/config/extended`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -162,7 +213,7 @@ export const useApiConfigStore = defineStore('apiConfig', () => {
     error.value = null
 
     try {
-      const response = await fetch(`${BASE_URL}/api/test-connection`, {
+      const response = await fetch(`${baseUrl.value}/api/test-connection`, {
         method: 'POST',
       })
 
@@ -186,7 +237,7 @@ export const useApiConfigStore = defineStore('apiConfig', () => {
     error.value = null
 
     try {
-      const response = await fetch(`${BASE_URL}/api/terminal-groups`)
+      const response = await fetch(`${baseUrl.value}/api/terminal-groups`)
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
@@ -203,7 +254,7 @@ export const useApiConfigStore = defineStore('apiConfig', () => {
     }
   }
 
-  const clearConfig = () => {
+  const resetConfig = () => {
     config.value = {
       api_login: '',
       organization_id: '',
@@ -225,17 +276,22 @@ export const useApiConfigStore = defineStore('apiConfig', () => {
     isLoading,
     error,
     lastUpdated,
+    serverMode,
 
     // Getters
     isConfigured,
     isFullyConfigured,
+    currentServerConfig,
+    baseUrl,
 
     // Actions
+    switchServerMode,
+    loadServerMode,
     fetchConfig,
     saveExtendedConfig,
     testConnection,
     getTerminalGroups,
-    clearConfig,
+    resetConfig,
     clearError,
   }
 })

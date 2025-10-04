@@ -1,9 +1,11 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useMainStore } from './main'
+import { useApiConfigStore } from './apiConfig'
 
 export const useWaiterStore = defineStore('waiter', () => {
   const mainStore = useMainStore()
+  const apiConfigStore = useApiConfigStore()
 
   // State
   const notifications = ref([])

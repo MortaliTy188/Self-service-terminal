@@ -5,7 +5,110 @@
 		"description": "API тесты для системы самообслуживания ресторана",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
-	"item": [
+		"item": [
+				{
+					"name": "Device Management",
+					"description": "1. Зарегистрируйте устройство через Register Device.\n2. Назначьте short_id через Assign Device Short ID (Admin).\n3. Получите информацию об устройстве.\n4. Обновите статус устройства с device_token.\n\nРекомендуемая последовательность:\n- Register Device → Assign Device Short ID → Get Device Info → Update Device Status.",
+				"item": [
+					{
+						"name": "Register Device",
+						"request": {
+							"method": "POST",
+							"header": [
+								{ "key": "Content-Type", "value": "application/json" }
+							],
+							"body": {
+								"mode": "raw",
+								"raw": "{\n  \"android_id\": \"test_android_id\",\n  \"model\": \"Lenovo Tab\",\n  \"os_version\": \"13.0\",\n  \"app_version\": \"1.0.0\"\n}"
+							},
+							"url": {
+								"raw": "{{baseUrl}}/api/devices/register",
+								"host": ["{{baseUrl}}"],
+								"path": ["api", "devices", "register"]
+							}
+						},
+						"response": []
+					},
+					{
+						"name": "Get Device Info",
+						"request": {
+							"method": "GET",
+							"header": [],
+							"url": {
+								"raw": "{{baseUrl}}/api/devices/{{android_id}}",
+								"host": ["{{baseUrl}}"],
+								"path": ["api", "devices", "{{android_id}}"]
+							}
+						},
+						"response": []
+					},
+					{
+						"name": "Update Device Status",
+						"request": {
+							"method": "POST",
+							"header": [
+								{ "key": "Content-Type", "value": "application/json" },
+								{ "key": "Authorization", "value": "Bearer {{device_token}}" }
+							],
+							"body": {
+								"mode": "raw",
+								"raw": "{\n  \"battery\": 85,\n  \"last_activity\": \"2025-10-03T12:00:00Z\"\n}"
+							},
+							"url": {
+								"raw": "{{baseUrl}}/api/devices/{{android_id}}/status",
+								"host": ["{{baseUrl}}"],
+								"path": ["api", "devices", "{{android_id}}", "status"]
+							}
+						},
+						"response": []
+					},
+					{
+						"name": "Assign Device Short ID (Admin)",
+						"request": {
+							"method": "POST",
+							"header": [
+								{ "key": "Content-Type", "value": "application/json" }
+							],
+							"body": {
+								"mode": "raw",
+								"raw": "{\n  \"android_id\": \"test_android_id\",\n  \"short_id\": \"1\"\n}"
+							},
+							"url": {
+								"raw": "{{baseUrl}}/api/admin/assign-device",
+								"host": ["{{baseUrl}}"],
+								"path": ["api", "admin", "assign-device"]
+							}
+						},
+						"response": []
+					}
+				]
+			},
+				{
+					"name": "Tablet Orders",
+					"description": "1. Убедитесь, что устройство зарегистрировано и short_id назначен.\n2. Получите device_token при регистрации.\n3. Создайте заказ, передав device_token в Authorization.\n\nРекомендуемая последовательность:\n- Device Management → Tablet Orders → Create Order (device_token).",
+				"item": [
+					{
+						"name": "Create Order (device_token)",
+						"request": {
+							"method": "POST",
+							"header": [
+								{ "key": "Content-Type", "value": "application/json" },
+								{ "key": "Authorization", "value": "Bearer {{device_token}}" }
+							],
+							"body": {
+								"mode": "raw",
+								"raw": "{\n  \"device_android_id\": \"test_android_id\",\n  \"table_short_id\": \"1\",\n  \"items\": [{\"menu_item_id\": \"menu_test_1\", \"qty\": 2}],\n  \"total\": 500\n}"
+							},
+							"url": {
+								"raw": "{{baseUrl}}/api/orders",
+								"host": ["{{baseUrl}}"],
+								"path": ["api", "orders"]
+							}
+						},
+						"response": []
+					}
+				]
+			},
 		{
 			"name": "Health Check",
 			"request": {
@@ -19,8 +122,9 @@
 			},
 			"response": []
 		},
-		{
-			"name": "Menu Management",
+			{
+				"name": "Menu Management",
+				"description": "1. Получите меню.\n2. Измените статус активности блюда.\n\nРекомендуемая последовательность:\n- Get Menu → Set Menu Item Active Status.",
 			"item": [
 				{
 					"name": "Get Menu",
@@ -36,28 +140,9 @@
 					"response": []
 				},
 				{
-					"name": "Get Menu by Category",
+					"name": "Set Menu Item Active Status",
 					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{baseUrl}}/menu?category_id=cat_1",
-							"host": ["{{baseUrl}}"],
-							"path": ["menu"],
-							"query": [
-								{
-									"key": "category_id",
-									"value": "cat_1"
-								}
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Create Menu Item",
-					"request": {
-						"method": "POST",
+						"method": "PATCH",
 						"header": [
 							{
 								"key": "Content-Type",
@@ -66,77 +151,21 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"name\": \"Борщ украинский\",\n    \"price\": 350,\n    \"image\": \"https://images.unsplash.com/photo-1547592166-23ac45744acd?w=300\",\n    \"category_id\": \"cat_1\"\n}"
+							"raw": "{\n    \"is_active\": false\n}"
 						},
 						"url": {
-							"raw": "{{baseUrl}}/menu",
+							"raw": "{{baseUrl}}/menu/{{menuItemId}}/active",
 							"host": ["{{baseUrl}}"],
-							"path": ["menu"]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Update Menu Item",
-					"request": {
-						"method": "PUT",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"name\": \"Борщ украинский (обновленный)\",\n    \"price\": 380,\n    \"image\": \"https://images.unsplash.com/photo-1547592166-23ac45744acd?w=300\"\n}"
-						},
-						"url": {
-							"raw": "{{baseUrl}}/menu/{{menuItemId}}",
-							"host": ["{{baseUrl}}"],
-							"path": ["menu", "{{menuItemId}}"]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Delete Menu Item",
-					"request": {
-						"method": "DELETE",
-						"header": [],
-						"url": {
-							"raw": "{{baseUrl}}/menu/{{menuItemId}}",
-							"host": ["{{baseUrl}}"],
-							"path": ["menu", "{{menuItemId}}"]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Upload Menu (Bulk)",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "[\n    {\n        \"id\": \"menu_test_1\",\n        \"name\": \"Пицца Маргарита\",\n        \"price\": 450,\n        \"image\": \"https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=300\",\n        \"category_id\": \"cat_1\"\n    },\n    {\n        \"id\": \"menu_test_2\",\n        \"name\": \"Паста Карбонара\",\n        \"price\": 380,\n        \"image\": \"https://images.unsplash.com/photo-1621996346565-e3dbc353d2e5?w=300\",\n        \"category_id\": \"cat_1\"\n    }\n]"
-						},
-						"url": {
-							"raw": "{{baseUrl}}/menu/upload",
-							"host": ["{{baseUrl}}"],
-							"path": ["menu", "upload"]
+							"path": ["menu", "{{menuItemId}}", "active"]
 						}
 					},
 					"response": []
 				}
 			]
 		},
-		{
-			"name": "Categories Management",
+			{
+				"name": "Categories Management",
+				"description": "1. Получите список категорий.\n\nРекомендуемая последовательность:\n- Get Categories.",
 			"item": [
 				{
 					"name": "Get Categories",
@@ -150,68 +179,12 @@
 						}
 					},
 					"response": []
-				},
-				{
-					"name": "Create Category",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"name\": \"Основные блюда\"\n}"
-						},
-						"url": {
-							"raw": "{{baseUrl}}/categories",
-							"host": ["{{baseUrl}}"],
-							"path": ["categories"]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Update Category",
-					"request": {
-						"method": "PUT",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"name\": \"Горячие блюда\"\n}"
-						},
-						"url": {
-							"raw": "{{baseUrl}}/categories/{{categoryId}}",
-							"host": ["{{baseUrl}}"],
-							"path": ["categories", "{{categoryId}}"]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Delete Category",
-					"request": {
-						"method": "DELETE",
-						"header": [],
-						"url": {
-							"raw": "{{baseUrl}}/categories/{{categoryId}}",
-							"host": ["{{baseUrl}}"],
-							"path": ["categories", "{{categoryId}}"]
-						}
-					},
-					"response": []
 				}
 			]
 		},
-		{
-			"name": "Cart Management",
+			{
+				"name": "Cart Management",
+				"description": "1. Получите корзину для стола.\n2. Добавьте блюдо в корзину.\n3. Удалите блюдо из корзины.\n4. Оформите заказ.\n\nРекомендуемая последовательность:\n- Get Cart → Add to Cart → Remove from Cart → Checkout.",
 			"item": [
 				{
 					"name": "Get Cart",
@@ -219,9 +192,15 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/cart",
+							"raw": "{{baseUrl}}/cart?table_id=1",
 							"host": ["{{baseUrl}}"],
-							"path": ["cart"]
+							"path": ["cart"],
+							"query": [
+								{
+									"key": "table_id",
+									"value": "1"
+								}
+							]
 						}
 					},
 					"response": []
@@ -238,7 +217,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"menu_item_id\": \"menu_test_1\",\n    \"qty\": 2\n}"
+							"raw": "{\n    \"menu_item_id\": \"menu_test_1\",\n    \"qty\": 2,\n    \"table_id\": \"1\"\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/cart/add",
@@ -260,7 +239,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"menu_item_id\": \"menu_test_1\"\n}"
+							"raw": "{\n    \"menu_item_id\": \"menu_test_1\",\n    \"table_id\": \"1\"\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/cart/remove",
@@ -282,7 +261,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"order_id\": \"ord_{{$timestamp}}\",\n    \"table_number\": 5\n}"
+							"raw": "{\n    \"order_id\": \"ord_{{$timestamp}}\",\n    \"table_id\": \"1\"\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/cart/checkout",
@@ -294,8 +273,9 @@
 				}
 			]
 		},
-		{
-			"name": "Orders Management",
+			{
+				"name": "Orders Management",
+				"description": "1. Получите все заказы.\n2. Фильтруйте заказы по статусу, столу, пагинации.\n3. Обновите статус заказа.\n\nРекомендуемая последовательность:\n- Get All Orders → Get Orders by Status/Table/Pagination → Update Order Status.",
 			"item": [
 				{
 					"name": "Get All Orders",
@@ -439,8 +419,9 @@
 				}
 			]
 		},
-		{
-			"name": "Admin Authentication",
+			{
+				"name": "Admin Authentication",
+				"description": "1. Проверьте ключ администратора.\n2. Проверьте сессии.\n\nРекомендуемая последовательность:\n- Admin Verify → Validate Session.",
 			"item": [
 				{
 					"name": "Admin Verify - Valid Key",
@@ -576,8 +557,9 @@
 				}
 			]
 		},
-		{
-			"name": "Admin Legacy",
+			{
+				"name": "Admin Legacy",
+				"description": "1. Вход в админ-панель (устаревший метод).\n2. Получите заказы, меню, позиции заказа.\n\nРекомендуемая последовательность:\n- Admin Login (Legacy) → Get Admin Orders/Menu/Order Items.",
 			"item": [
 				{
 					"name": "Admin Login (Legacy)",
@@ -648,8 +630,9 @@
 				}
 			]
 		},
-		{
-			"name": "Table Management",
+			{
+				"name": "Table Management",
+				"description": "1. Получите список столов.\n2. Синхронизируйте столы с iiko.\n3. Получите стол по ID, маппинг, статус.\n4. Оформите заказ с table_id.\n\nРекомендуемая последовательность:\n- Get All Tables → Sync Tables → Get Table by ID/Mapping/Status → Create Order with Table ID.",
 			"item": [
 				{
 					"name": "Get All Tables",
@@ -740,8 +723,9 @@
 				}
 			]
 		},
-		{
-			"name": "API Configuration",
+			{
+				"name": "API Configuration",
+				"description": "1. Получите текущую конфигурацию API.\n2. Установите базовую и расширенную конфигурацию.\n3. Проверьте подключение к iiko, получите терминальные группы.\n\nРекомендуемая последовательность:\n- Get Current API Config → Set API Configuration → Set Extended API Configuration → Test iiko Connection → Get Terminal Groups.",
 			"item": [
 				{
 					"name": "Get Current API Config",
@@ -823,6 +807,38 @@
 							"raw": "{{baseUrl}}/api/terminal-groups",
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "terminal-groups"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+			{
+				"name": "Sync Data",
+				"description": "1. Синхронизируйте столы и меню с iiko.\n\nРекомендуемая последовательность:\n- Sync Tables → Sync Menu.",
+			"item": [
+				{
+					"name": "Sync Tables",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/tables/sync",
+							"host": ["{{baseUrl}}"],
+							"path": ["tables", "sync"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Sync Menu",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/sync/nomenclature",
+							"host": ["{{baseUrl}}"],
+							"path": ["sync", "nomenclature"]
 						}
 					},
 					"response": []

@@ -8,6 +8,9 @@
     </div>
 
     <div class="settings-content">
+      <!-- Селектор режима сервера -->
+      <ServerModeSelector />
+      
       <div class="settings-grid">
         <!-- Кнопка Аккаунт -->
         <div class="settings-card">
@@ -279,6 +282,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useSplashSettings } from '@/hooks'
 import { useSettingsStore, useApiConfigStore } from '@/stores'
 import placeholderImageSrc from '@/assets/mainBackground.png'
+import ServerModeSelector from './ServerModeSelector.vue'
 
 const emit = defineEmits(['save-settings'])
 

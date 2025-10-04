@@ -1,7 +1,10 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { useApiConfigStore } from './apiConfig'
 
 export const useAuthStore = defineStore('auth', () => {
+  const apiConfigStore = useApiConfigStore()
+  
   // State
   const isAuthenticated = ref(false)
   const sessionId = ref(null)
@@ -9,7 +12,6 @@ export const useAuthStore = defineStore('auth', () => {
   const adminUser = ref(null)
 
   // Constants
-  const BASE_URL = 'http://localhost:8080'
   const VALID_ADMIN_KEYS = ['admin123', 'terminal-admin', 'management-key', 'settings-access']
 
   // Getters
@@ -23,7 +25,7 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       console.log('Проверка админ-ключа на сервере...')
 
-      const response = await fetch(`${BASE_URL}/admin/verify`, {
+      const response = await fetch(`${apiConfigStore.baseUrl}/admin/verify`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -94,7 +96,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     // Дополнительно проверяем на сервере
     try {
-      const response = await fetch(`${BASE_URL}/admin/validate-session`, {
+      const response = await fetch(`${apiConfigStore.baseUrl}/admin/validate-session`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
