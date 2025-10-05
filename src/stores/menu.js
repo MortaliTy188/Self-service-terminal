@@ -39,8 +39,8 @@ export const useMenuStore = defineStore('menu', () => {
     error.value = null
 
     try {
-      console.log('🍽️ Загружаем меню с сервера:', `${apiConfigStore.baseUrl}/menu`)
-      const response = await fetch(`${apiConfigStore.baseUrl}/menu`)
+      console.log('🍽️ Загружаем меню с сервера:', apiConfigStore.getSecureUrl('/menu'))
+      const response = await fetch(apiConfigStore.getSecureUrl('/menu'))
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
@@ -49,7 +49,7 @@ export const useMenuStore = defineStore('menu', () => {
       const data = await response.json()
       menuItems.value = data
       console.log('✅ Меню успешно загружено с сервера:', {
-        source: `${apiConfigStore.baseUrl}/menu`,
+        source: apiConfigStore.getSecureUrl('/menu'),
         itemsCount: data.length,
         items: data,
       })
@@ -64,8 +64,8 @@ export const useMenuStore = defineStore('menu', () => {
 
   const fetchCategories = async () => {
     try {
-      console.log('📂 Загружаем категории с сервера:', `${apiConfigStore.baseUrl}/categories`)
-      const response = await fetch(`${apiConfigStore.baseUrl}/categories`)
+      console.log('📂 Загружаем категории с сервера:', apiConfigStore.getSecureUrl('/categories'))
+      const response = await fetch(apiConfigStore.getSecureUrl('/categories'))
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
@@ -74,7 +74,7 @@ export const useMenuStore = defineStore('menu', () => {
       const data = await response.json()
       categories.value = data
       console.log('✅ Категории успешно загружены с сервера:', {
-        source: `${apiConfigStore.baseUrl}/categories`,
+        source: apiConfigStore.getSecureUrl('/categories'),
         categoriesCount: data.length,
         categories: data,
       })

@@ -8,34 +8,38 @@ export const useApiConfigStore = defineStore('apiConfig', () => {
     organization_id: '',
     terminal_group_id: '',
     payment_type_id: '',
-    table_id: '',
   })
 
   const isLoading = ref(false)
   const error = ref(null)
   const lastUpdated = ref(null)
-  
+
   // Режимы работы
   const serverMode = ref('local') // 'local' или 'public'
-  
+
   // Constants
   const SERVER_CONFIGS = {
     local: {
       url: 'http://localhost:8080',
-      name: 'Локальный сервер'
+      name: 'Локальный сервер',
     },
     public: {
-      url: 'http://83.222.9.90:8081',
-      name: 'Публичный сервер'
-    }
+      url: 'http://83.222.9.90:8080',
+      name: 'Публичный сервер',
+    },
   }
 
   // Getters
   const currentServerConfig = computed(() => {
     return SERVER_CONFIGS[serverMode.value] || SERVER_CONFIGS.local
   })
-  
+
   const baseUrl = computed(() => {
+    // Если приложение запущено через HTTPS (zrok туннель), используем относительные URL для прохождения через Vite прокси
+    if (window.location.protocol === 'https:' && window.location.hostname.includes('zrok.io')) {
+      return '' // Относительные URL - проходят через Vite прокси
+    }
+
     return currentServerConfig.value.url
   })
   const isConfigured = computed(() => {
@@ -43,8 +47,7 @@ export const useApiConfigStore = defineStore('apiConfig', () => {
       config.value.api_login &&
       config.value.organization_id &&
       config.value.terminal_group_id &&
-      config.value.payment_type_id &&
-      config.value.table_id
+      config.value.payment_type_id
     )
   })
 
@@ -61,24 +64,26 @@ export const useApiConfigStore = defineStore('apiConfig', () => {
     if (SERVER_CONFIGS[mode]) {
       serverMode.value = mode
       console.log(`🔄 Переключено на ${SERVER_CONFIGS[mode].name}: ${SERVER_CONFIGS[mode].url}`)
-      
+
       // Сохраняем выбор в localStorage
       localStorage.setItem('serverMode', mode)
     }
   }
-  
+
   const loadServerMode = async () => {
     // Сначала проверяем переменные окружения (из .env.local)
     const envMode = import.meta.env.VITE_SERVER_MODE
     const envUrl = import.meta.env.VITE_SERVER_URL
     const envName = import.meta.env.VITE_SERVER_NAME
-    
+
     if (envMode && SERVER_CONFIGS[envMode]) {
       serverMode.value = envMode
-      console.log(`📂 Загружен режим из переменных окружения: ${envName || SERVER_CONFIGS[envMode].name} (${envUrl || SERVER_CONFIGS[envMode].url})`)
+      console.log(
+        `📂 Загружен режим из переменных окружения: ${envName || SERVER_CONFIGS[envMode].name} (${envUrl || SERVER_CONFIGS[envMode].url})`,
+      )
       return
     }
-    
+
     // Если переменные окружения не установлены, используем localStorage
     const savedMode = localStorage.getItem('serverMode')
     if (savedMode && SERVER_CONFIGS[savedMode]) {
@@ -88,7 +93,7 @@ export const useApiConfigStore = defineStore('apiConfig', () => {
       console.log(`📂 Использован режим по умолчанию: ${SERVER_CONFIGS.local.name}`)
     }
   }
-  
+
   const fetchConfig = async () => {
     isLoading.value = true
     error.value = null
@@ -106,7 +111,6 @@ export const useApiConfigStore = defineStore('apiConfig', () => {
             organization_id: '',
             terminal_group_id: '',
             payment_type_id: '',
-            table_id: '',
           }
           return { success: true, data: null, configured: false }
         }
@@ -123,7 +127,6 @@ export const useApiConfigStore = defineStore('apiConfig', () => {
           organization_id: result.organization_id || '',
           terminal_group_id: result.terminal_group_id || '',
           payment_type_id: result.payment_type_id || '',
-          table_id: result.table_id || '',
         }
         lastUpdated.value = result.updated_at
         console.log('Конфигурация обновлена:', config.value)
@@ -135,7 +138,6 @@ export const useApiConfigStore = defineStore('apiConfig', () => {
           organization_id: '',
           terminal_group_id: '',
           payment_type_id: '',
-          table_id: '',
         }
       }
 
@@ -150,7 +152,6 @@ export const useApiConfigStore = defineStore('apiConfig', () => {
         organization_id: '',
         terminal_group_id: '',
         payment_type_id: '',
-        table_id: '',
       }
 
       return { success: false, error: err.message }
@@ -187,7 +188,6 @@ export const useApiConfigStore = defineStore('apiConfig', () => {
           organization_id: result.data.organization_id || '',
           terminal_group_id: result.data.terminal_group_id || '',
           payment_type_id: result.data.payment_type_id || '',
-          table_id: result.data.table_id || '',
         }
         lastUpdated.value = result.data.updated_at
         console.log('Локальная конфигурация обновлена:', config.value)
@@ -260,7 +260,6 @@ export const useApiConfigStore = defineStore('apiConfig', () => {
       organization_id: '',
       terminal_group_id: '',
       payment_type_id: '',
-      table_id: '',
     }
     error.value = null
     lastUpdated.value = null
@@ -268,6 +267,16 @@ export const useApiConfigStore = defineStore('apiConfig', () => {
 
   const clearError = () => {
     error.value = null
+  }
+
+  // Вспомогательная функция для получения безопасных URL
+  const getSecureUrl = (path = '') => {
+    // Если приложение запущено через HTTPS (zrok туннель), используем относительные URL
+    if (window.location.protocol === 'https:' && window.location.hostname.includes('zrok.io')) {
+      return path // Относительный URL проходит через Vite прокси
+    }
+
+    return `${baseUrl.value}${path}`
   }
 
   return {
@@ -293,5 +302,6 @@ export const useApiConfigStore = defineStore('apiConfig', () => {
     getTerminalGroups,
     resetConfig,
     clearError,
+    getSecureUrl,
   }
 })

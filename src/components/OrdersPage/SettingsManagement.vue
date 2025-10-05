@@ -10,7 +10,7 @@
     <div class="settings-content">
       <!-- Селектор режима сервера -->
       <ServerModeSelector />
-      
+
       <div class="settings-grid">
         <!-- Кнопка Аккаунт -->
         <div class="settings-card">
@@ -152,16 +152,6 @@
                 type="text"
                 class="form-input"
                 placeholder="09322f46-578a-d210-add7-eec222a08871"
-              />
-            </div>
-            <div class="form-group">
-              <label for="tableId">Table ID</label>
-              <input
-                id="tableId"
-                v-model="apiConfig.table_id"
-                type="text"
-                class="form-input"
-                placeholder="291dd02b-eafe-4ea6-86f5-c4f3ca0043aa"
               />
             </div>
           </div>
@@ -322,7 +312,6 @@ const apiConfig = ref({
   organization_id: '',
   terminal_group_id: '',
   payment_type_id: '',
-  table_id: '',
 })
 
 // Настройки заставки

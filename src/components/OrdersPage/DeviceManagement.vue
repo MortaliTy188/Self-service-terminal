@@ -2,311 +2,476 @@
   <div class="device-management">
     <div class="header">
       <h2>Управление устройствами</h2>
-      <div class="header-info">
-        <span class="device-count">Всего устройств: {{ devices.length }}</span>
-        <span class="online-count">Онлайн: {{ onlineDevicesCount }}</span>
+      <div class="header-actions">
+        <button class="btn-refresh" @click="loadDevices" :disabled="deviceStore.devicesLoading">
+          🔄 Обновить список
+        </button>
+        <button class="btn-add" @click="showRegisterModal = true">
+          ➕ Зарегистрировать планшет
+        </button>
       </div>
     </div>
 
-    <div v-if="isLoading" class="loading">
+    <!-- Индикатор загрузки -->
+    <div v-if="deviceStore.devicesLoading" class="loading-spinner">
       <div class="spinner"></div>
-      <p>Загрузка устройств...</p>
+      <p>Загружаем список устройств...</p>
     </div>
 
-    <div v-else-if="error" class="error">
-      <p>Ошибка загрузки: {{ error }}</p>
-      <button class="retry-btn" @click="$emit('retry')">Повторить</button>
+    <!-- Сообщение об ошибке -->
+    <div v-else-if="deviceStore.devicesError" class="error-message">
+      <p>❌ Ошибка загрузки: {{ deviceStore.devicesError }}</p>
+      <button class="btn-retry" @click="loadDevices">Повторить</button>
     </div>
 
-    <div v-else class="devices-grid">
-      <div v-for="device in devices" :key="device.id" class="device-card">
+    <!-- Список устройств -->
+    <div v-else-if="devices.length > 0" class="devices-grid">
+      <div v-for="device in devices" :key="device.android_id" class="device-card">
         <div class="device-header">
-          <div
-            class="device-status"
-            :class="{ online: device.isOnline, offline: !device.isOnline }"
-          >
-            <div class="status-indicator"></div>
-            <span class="status-text">{{ device.isOnline ? 'Онлайн' : 'Офлайн' }}</span>
+          <div class="device-icon">📱</div>
+          <div class="device-info">
+            <h3>{{ device.model || 'Unknown Device' }}</h3>
+            <p class="android-id">{{ device.android_id }}</p>
           </div>
-          <div class="device-table">Стол {{ device.tableNumber }}</div>
+          <div :class="['status-badge', device.status || 'offline']">
+            {{ getStatusText(device.status) }}
+          </div>
         </div>
 
-        <div class="device-info">
-          <div class="battery-section">
-            <div class="battery-label">Заряд батареи</div>
-            <div class="battery-container">
-              <div class="battery-icon">
-                <div
-                  class="battery-fill"
-                  :style="{ width: device.batteryLevel + '%' }"
-                  :class="getBatteryClass(device.batteryLevel)"
-                ></div>
-              </div>
-              <span class="battery-percentage">{{ device.batteryLevel }}%</span>
-            </div>
+        <div class="device-details">
+          <div class="detail-row">
+            <span class="label">Номер стола:</span>
+            <span class="value">
+              <span v-if="device.short_id" class="table-number">{{ device.short_id }}</span>
+              <span v-else class="not-assigned">Не назначен</span>
+            </span>
           </div>
-
-          <div class="device-details">
-            <div class="detail-item">
-              <span class="detail-label">Модель:</span>
-              <span class="detail-value">{{ device.model }}</span>
-            </div>
-            <div class="detail-item">
-              <span class="detail-label">Последняя активность:</span>
-              <span class="detail-value">{{ formatLastActivity(device.lastActivity) }}</span>
-            </div>
-            <div class="detail-item">
-              <span class="detail-label">Ключ подключения:</span>
-              <input
-                type="text"
-                :value="device.connectionKey"
-                @input="updateConnectionKey(device.id, $event.target.value)"
-                @blur="$event.target.value = device.connectionKey"
-                class="connection-key-input"
-                placeholder="Введите ключ подключения"
-              />
-            </div>
+          <div class="detail-row">
+            <span class="label">OS версия:</span>
+            <span class="value">{{ device.os_version || 'N/A' }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">App версия:</span>
+            <span class="value">{{ device.app_version || 'N/A' }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">Батарея:</span>
+            <span class="value">
+              <span :class="['battery', getBatteryClass(device.battery)]">
+                🔋 {{ device.battery || 0 }}%
+              </span>
+            </span>
+          </div>
+          <div class="detail-row">
+            <span class="label">Последняя активность:</span>
+            <span class="value">{{ formatDate(device.last_activity) }}</span>
           </div>
         </div>
 
         <div class="device-actions">
-          <button class="action-btn delete-btn" @click="deleteDevice(device.id)">Удалить</button>
+          <button
+            class="btn-assign"
+            @click="openAssignModal(device)"
+            :disabled="!device.short_id === false"
+          >
+            {{ device.short_id ? '✏️ Изменить стол' : '📍 Назначить стол' }}
+          </button>
+          <button class="btn-info" @click="loadDeviceInfo(device.android_id)">🔄 Обновить</button>
         </div>
       </div>
     </div>
 
-    <div v-if="!isLoading && devices.length === 0" class="empty-state">
+    <!-- Пустой список -->
+    <div v-else class="empty-state">
       <div class="empty-icon">📱</div>
-      <h3>Устройства не найдены</h3>
-      <p>Подключенные планшеты будут отображаться здесь</p>
+      <h3>Планшеты не найдены</h3>
+      <p>Начните с регистрации первого планшета</p>
+      <button class="btn-add-large" @click="showRegisterModal = true">
+        ➕ Зарегистрировать планшет
+      </button>
+    </div>
+
+    <!-- Модальное окно регистрации устройства -->
+    <div v-if="showRegisterModal" class="modal-overlay" @click="closeRegisterModal">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h3>Регистрация нового планшета</h3>
+          <button class="close-btn" @click="closeRegisterModal">✕</button>
+        </div>
+
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="androidId">Android ID *</label>
+            <input
+              id="androidId"
+              v-model="newDevice.android_id"
+              type="text"
+              class="form-input"
+              placeholder="test_android_id_001"
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="model">Модель устройства *</label>
+            <input
+              id="model"
+              v-model="newDevice.model"
+              type="text"
+              class="form-input"
+              placeholder="Samsung Galaxy Tab A7"
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="osVersion">Версия ОС</label>
+            <input
+              id="osVersion"
+              v-model="newDevice.os_version"
+              type="text"
+              class="form-input"
+              placeholder="13.0"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="appVersion">Версия приложения</label>
+            <input
+              id="appVersion"
+              v-model="newDevice.app_version"
+              type="text"
+              class="form-input"
+              placeholder="1.0.0"
+            />
+          </div>
+
+          <div v-if="registerError" class="error-message">{{ registerError }}</div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn-cancel" @click="closeRegisterModal">Отмена</button>
+          <button
+            class="btn-register"
+            @click="registerNewDevice"
+            :disabled="!newDevice.android_id || !newDevice.model || isRegistering"
+          >
+            {{ isRegistering ? 'Регистрация...' : 'Зарегистрировать' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Модальное окно назначения стола -->
+    <div v-if="showAssignModal" class="modal-overlay" @click="closeAssignModal">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h3>Назначить номер стола</h3>
+          <button class="close-btn" @click="closeAssignModal">✕</button>
+        </div>
+
+        <div class="modal-body">
+          <p class="device-name">{{ selectedDevice?.model }}</p>
+          <p class="android-id-small">{{ selectedDevice?.android_id }}</p>
+
+          <div class="form-group">
+            <label for="shortId">Номер стола (Short ID) *</label>
+            <input
+              id="shortId"
+              v-model="assignShortId"
+              type="text"
+              class="form-input"
+              placeholder="1"
+              required
+            />
+            <small>Короткий идентификатор стола для планшета</small>
+          </div>
+
+          <div v-if="assignError" class="error-message">{{ assignError }}</div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn-cancel" @click="closeAssignModal">Отмена</button>
+          <button
+            class="btn-assign-confirm"
+            @click="confirmAssignShortId"
+            :disabled="!assignShortId || isAssigning"
+          >
+            {{ isAssigning ? 'Назначение...' : 'Назначить' }}
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
+import { useDeviceStore } from '@/stores/device'
 
-const BASE_URL = 'http://83.222.9.90:8080'
+const deviceStore = useDeviceStore()
 
-const props = defineProps({
-  isLoading: {
-    type: Boolean,
-    default: false,
-  },
-  error: {
-    type: String,
-    default: null,
-  },
+// State
+const devices = ref([])
+const showRegisterModal = ref(false)
+const showAssignModal = ref(false)
+const isRegistering = ref(false)
+const isAssigning = ref(false)
+const registerError = ref('')
+const assignError = ref('')
+const selectedDevice = ref(null)
+const assignShortId = ref('')
+
+const newDevice = ref({
+  android_id: '',
+  model: '',
+  os_version: '',
+  app_version: '1.0.0',
 })
 
-const emit = defineEmits(['retry', 'delete-device', 'open-settings', 'update-connection-key'])
+// Methods
+const loadDevices = async () => {
+  console.log('📱 Загружаем список устройств...')
 
-// Статические данные устройств
-const devices = ref([
-  {
-    id: 1,
-    tableNumber: 5,
-    batteryLevel: 85,
-    isOnline: true,
-    model: 'Samsung Galaxy Tab A7',
-    lastActivity: new Date(Date.now() - 1000 * 60 * 5), // 5 минут назад
-    connectionKey: 'TAB-5-A7-2023',
-  },
-  {
-    id: 2,
-    tableNumber: 12,
-    batteryLevel: 45,
-    isOnline: true,
-    model: 'iPad Air 2022',
-    lastActivity: new Date(Date.now() - 1000 * 60 * 15), // 15 минут назад
-    connectionKey: 'IPAD-12-AIR-2022',
-  },
-  {
-    id: 3,
-    tableNumber: 8,
-    batteryLevel: 92,
-    isOnline: false,
-    model: 'Lenovo Tab M10',
-    lastActivity: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 часа назад
-    connectionKey: 'LENOVO-8-M10',
-  },
-  {
-    id: 4,
-    tableNumber: 3,
-    batteryLevel: 20,
-    isOnline: true,
-    model: 'Samsung Galaxy Tab S8',
-    lastActivity: new Date(Date.now() - 1000 * 60 * 2), // 2 минуты назад
-    connectionKey: 'SAMSUNG-3-S8',
-  },
-  {
-    id: 5,
-    tableNumber: 15,
-    batteryLevel: 67,
-    isOnline: true,
-    model: 'iPad Pro 11"',
-    lastActivity: new Date(Date.now() - 1000 * 60 * 30), // 30 минут назад
-    connectionKey: 'IPAD-15-PRO-11',
-  },
-  {
-    id: 6,
-    tableNumber: 7,
-    batteryLevel: 15,
-    isOnline: false,
-    model: 'Huawei MediaPad T5',
-    lastActivity: new Date(Date.now() - 1000 * 60 * 60 * 4), // 4 часа назад
-    connectionKey: 'HUAWEI-7-T5',
-  },
-])
-
-const onlineDevicesCount = computed(() => {
-  return devices.value.filter((device) => device.isOnline).length
-})
-
-const getBatteryClass = (batteryLevel) => {
-  if (batteryLevel <= 20) return 'battery-low'
-  if (batteryLevel <= 50) return 'battery-medium'
-  return 'battery-high'
-}
-
-const formatLastActivity = (lastActivity) => {
-  const now = new Date()
-  const diff = now - lastActivity
-  const minutes = Math.floor(diff / (1000 * 60))
-  const hours = Math.floor(diff / (1000 * 60 * 60))
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-
-  if (minutes < 1) return 'Только что'
-  if (minutes < 60) return `${minutes} мин. назад`
-  if (hours < 24) return `${hours} ч. назад`
-  return `${days} дн. назад`
-}
-
-const deleteDevice = (deviceId) => {
-  if (confirm('Вы уверены, что хотите удалить это устройство?')) {
-    emit('delete-device', deviceId)
-    // Удаляем устройство из локального списка
-    const deviceIndex = devices.value.findIndex((device) => device.id === deviceId)
-    if (deviceIndex !== -1) {
-      devices.value.splice(deviceIndex, 1)
-    }
-    console.log('Удаление устройства:', deviceId)
-  }
-}
-
-const openDeviceSettings = (deviceId) => {
-  emit('open-settings', deviceId)
-  // Здесь будет логика открытия настроек устройства
-  console.log('Настройки устройства:', deviceId)
-}
-
-const updateConnectionKey = async (deviceId, newKey) => {
   try {
-    console.log('Обновление ключа подключения для устройства:', deviceId, newKey)
+    const result = await deviceStore.getAllDevices(true) // Принудительное обновление
 
-    // API запрос (пока закомментирован, так как эндпоинта нет)
-    // const response = await fetch(`${BASE_URL}/devices/${deviceId}/connection-key`, {
-    //   method: 'PUT',
-    //   headers: {
-    //     'Content-Type': 'application/json',
-    //   },
-    //   body: JSON.stringify({ connectionKey: newKey })
-    // })
-
-    // if (!response.ok) {
-    //   throw new Error(`HTTP error! status: ${response.status}`)
-    // }
-
-    // const updatedDevice = await response.json()
-
-    // Временно обновляем локально
-    const device = devices.value.find((d) => d.id === deviceId)
-    if (device) {
-      device.connectionKey = newKey
-      emit('update-connection-key', deviceId, newKey)
-      console.log('Ключ подключения успешно обновлен (локально)')
+    if (result.success) {
+      devices.value = result.data
+      console.log('✅ Устройства загружены:', devices.value)
+    } else {
+      console.error('❌ Ошибка загрузки устройств:', result.error)
+      // Показываем уведомление об ошибке
+      alert(`Ошибка загрузки устройств: ${result.error}`)
     }
   } catch (error) {
-    console.error('Ошибка при обновлении ключа подключения:', error)
-    // В будущем здесь можно показать уведомление об ошибке
-    // Восстанавливаем старое значение при ошибке
-    // const device = devices.value.find((d) => d.id === deviceId)
-    // if (device && device.connectionKey !== newKey) {
-    //   // Восстановить старое значение в интерфейсе
-    // }
+    console.error('❌ Критическая ошибка:', error)
+    alert(`Критическая ошибка: ${error.message}`)
   }
 }
 
-// Эмуляция загрузки данных
+const loadDeviceInfo = async (android_id) => {
+  console.log('🔄 Обновляем информацию об устройстве:', android_id)
+
+  try {
+    const result = await deviceStore.getDeviceInfo(android_id)
+    if (result.success) {
+      // Обновляем устройство в списке
+      const index = devices.value.findIndex((d) => d.android_id === android_id)
+      if (index !== -1) {
+        devices.value[index] = { ...devices.value[index], ...result.data.device }
+        console.log('✅ Информация об устройстве обновлена')
+      }
+    } else {
+      console.error('❌ Ошибка обновления устройства:', result.error)
+      alert(`Ошибка обновления: ${result.error}`)
+    }
+  } catch (error) {
+    console.error('❌ Критическая ошибка обновления:', error)
+    alert(`Критическая ошибка: ${error.message}`)
+  }
+}
+
+const registerNewDevice = async () => {
+  registerError.value = ''
+  isRegistering.value = true
+
+  try {
+    console.log('📱 Регистрируем устройство:', newDevice.value)
+    const result = await deviceStore.registerDevice(newDevice.value)
+
+    if (result.success) {
+      console.log('✅ Устройство зарегистрировано, перезагружаем список...')
+
+      // Перезагружаем весь список устройств
+      await loadDevices()
+
+      closeRegisterModal()
+
+      // Показываем уведомление
+      alert(
+        `Устройство успешно зарегистрировано!\nDevice Token: ${result.data.device_token || result.data.token}`,
+      )
+    } else {
+      registerError.value = result.error || 'Ошибка регистрации устройства'
+    }
+  } catch (err) {
+    registerError.value = err.message
+  } finally {
+    isRegistering.value = false
+  }
+}
+
+const openAssignModal = (device) => {
+  selectedDevice.value = device
+  assignShortId.value = device.short_id || ''
+  assignError.value = ''
+  showAssignModal.value = true
+}
+
+const confirmAssignShortId = async () => {
+  assignError.value = ''
+  isAssigning.value = true
+
+  try {
+    console.log(
+      '📍 Назначаем номер стола:',
+      assignShortId.value,
+      'устройству:',
+      selectedDevice.value.android_id,
+    )
+
+    const result = await deviceStore.assignShortId(
+      selectedDevice.value.android_id,
+      assignShortId.value,
+    )
+
+    if (result.success) {
+      console.log('✅ Номер стола назначен, обновляем список...')
+
+      // Перезагружаем весь список устройств для актуальности
+      await loadDevices()
+
+      closeAssignModal()
+      alert(`Номер стола ${assignShortId.value} успешно назначен устройству!`)
+    } else {
+      assignError.value = result.error || 'Ошибка назначения номера стола'
+    }
+  } catch (err) {
+    assignError.value = err.message
+  } finally {
+    isAssigning.value = false
+  }
+}
+
+const closeRegisterModal = () => {
+  showRegisterModal.value = false
+  newDevice.value = {
+    android_id: '',
+    model: '',
+    os_version: '',
+    app_version: '1.0.0',
+  }
+  registerError.value = ''
+}
+
+const closeAssignModal = () => {
+  showAssignModal.value = false
+  selectedDevice.value = null
+  assignShortId.value = ''
+  assignError.value = ''
+}
+
+const getStatusText = (status) => {
+  const statusMap = {
+    online: '🟢 Онлайн',
+    offline: '🔴 Офлайн',
+    idle: '🟡 Неактивен',
+  }
+  return statusMap[status] || '⚪ Неизвестно'
+}
+
+const getBatteryClass = (battery) => {
+  if (battery > 60) return 'high'
+  if (battery > 30) return 'medium'
+  return 'low'
+}
+
+const formatDate = (dateString) => {
+  if (!dateString) return 'N/A'
+  const date = new Date(dateString)
+  const now = new Date()
+  const diff = Math.floor((now - date) / 1000 / 60) // в минутах
+
+  if (diff < 1) return 'Только что'
+  if (diff < 60) return `${diff} мин назад`
+  if (diff < 1440) return `${Math.floor(diff / 60)} ч назад`
+  return date.toLocaleString('ru-RU')
+}
+
+// Lifecycle
 onMounted(() => {
-  // В будущем здесь будет загрузка с сервера
-  console.log('DeviceManagement mounted, devices:', devices.value.length)
+  loadDevices()
 })
 </script>
 
 <style scoped>
 .device-management {
-  height: 100%;
+  padding: 20px;
+  max-width: 1400px;
   overflow-y: auto;
-  padding-bottom: 40px;
 }
 
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px;
-  background: white;
-  border-bottom: 1px solid #e5e7eb;
-  position: sticky;
-  top: 0;
-  z-index: 10;
+  margin-bottom: 30px;
 }
 
 .header h2 {
   margin: 0;
-  font-size: 24px;
-  font-weight: 600;
   color: #1f2937;
+  font-size: 24px;
 }
 
-.header-info {
+.header-actions {
   display: flex;
-  gap: 20px;
+  gap: 12px;
   align-items: center;
 }
 
-.device-count,
-.online-count {
-  font-size: 14px;
-  font-weight: 500;
-  padding: 6px 12px;
-  border-radius: 20px;
+.btn-refresh {
+  padding: 8px 16px;
   background: #f3f4f6;
   color: #374151;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-.online-count {
-  background: #d1fae5;
-  color: #065f46;
+.btn-refresh:hover:not(:disabled) {
+  background: #e5e7eb;
+  border-color: #9ca3af;
 }
 
-.loading {
+.btn-refresh:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-add {
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+/* Индикатор загрузки */
+.loading-spinner {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 200px;
-  gap: 16px;
+  padding: 60px 20px;
+  color: #6b7280;
 }
 
 .spinner {
   width: 40px;
   height: 40px;
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid #3b82f6;
+  border: 3px solid #f3f4f6;
+  border-top: 3px solid #10b981;
   border-radius: 50%;
   animation: spin 1s linear infinite;
+  margin-bottom: 16px;
 }
 
 @keyframes spin {
@@ -318,290 +483,434 @@ onMounted(() => {
   }
 }
 
-.error {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  padding: 40px;
-  color: #dc3545;
-}
-
-.retry-btn {
-  padding: 10px 20px;
-  background: #3b82f6;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.retry-btn:hover {
-  background: #2563eb;
-}
-
-.devices-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
-  gap: 20px;
-  padding: 20px 20px 40px 20px;
-}
-
-.device-card {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
-  transition:
-    transform 0.2s,
-    box-shadow 0.2s;
-}
-
-.device-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-}
-
-.device-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 20px;
-  background: #f8f9fa;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.device-status {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.status-indicator {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #dc2626;
-}
-
-.device-status.online .status-indicator {
-  background: #16a34a;
-}
-
-.status-text {
-  font-size: 14px;
-  font-weight: 500;
-  color: #dc2626;
-}
-
-.device-status.online .status-text {
-  color: #16a34a;
-}
-
-.device-table {
-  font-size: 18px;
-  font-weight: 600;
-  color: #1f2937;
-}
-
-.device-info {
-  padding: 20px;
-}
-
-.battery-section {
-  margin-bottom: 20px;
-}
-
-.battery-label {
-  font-size: 14px;
-  font-weight: 500;
-  color: #6b7280;
-  margin-bottom: 8px;
-}
-
-.battery-container {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.battery-icon {
-  width: 40px;
-  height: 20px;
-  border: 2px solid #d1d5db;
-  border-radius: 4px;
-  position: relative;
-  background: #f9fafb;
-}
-
-.battery-icon::after {
-  content: '';
-  position: absolute;
-  right: -6px;
-  top: 6px;
-  width: 4px;
-  height: 8px;
-  background: #d1d5db;
-  border-radius: 0 2px 2px 0;
-}
-
-.battery-fill {
-  height: 100%;
-  border-radius: 2px;
-  transition: width 0.3s ease;
-}
-
-.battery-high {
-  background: #16a34a;
-}
-
-.battery-medium {
-  background: #f59e0b;
-}
-
-.battery-low {
-  background: #dc2626;
-}
-
-.battery-percentage {
+.loading-spinner p {
+  margin: 0;
   font-size: 16px;
-  font-weight: 600;
-  color: #1f2937;
 }
 
-.device-details {
+/* Сообщение об ошибке */
+.error-message {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-}
-
-.detail-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.detail-label {
-  font-size: 14px;
-  color: #6b7280;
-  font-weight: 500;
-}
-
-.detail-value {
-  font-size: 14px;
-  color: #1f2937;
-  font-weight: 500;
-}
-
-.connection-key-input {
-  padding: 6px 10px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  font-size: 14px;
-  color: #1f2937;
-  background: #f9fafb;
-  min-width: 150px;
-  transition: all 0.2s;
-}
-
-.connection-key-input:focus {
-  outline: none;
-  border-color: #3b82f6;
-  background: white;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
-.connection-key-input:hover {
-  border-color: #9ca3af;
-}
-
-.device-actions {
-  display: flex;
-  gap: 12px;
-  padding: 16px 20px;
-  border-top: 1px solid #e5e7eb;
-  background: #f8f9fa;
-}
-
-.action-btn {
-  flex: 1;
-  padding: 10px 16px;
-  border: none;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  padding: 60px 20px;
+  color: #dc2626;
+  text-align: center;
 }
 
-.delete-btn {
-  background: #ef4444;
-  color: white;
+.error-message p {
+  margin: 0 0 16px 0;
+  font-size: 16px;
 }
 
-.delete-btn:hover {
+.btn-retry {
+  padding: 8px 16px;
   background: #dc2626;
-}
-
-.settings-btn {
-  background: #6b7280;
   color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-.settings-btn:hover {
-  background: #4b5563;
+.btn-retry:hover {
+  background: #b91c1c;
 }
 
+/* Пустое состояние */
 .empty-state {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 400px;
+  padding: 80px 20px;
   text-align: center;
   color: #6b7280;
 }
 
 .empty-icon {
   font-size: 64px;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
+  opacity: 0.5;
 }
 
 .empty-state h3 {
-  font-size: 24px;
-  color: #374151;
   margin: 0 0 8px 0;
+  font-size: 20px;
+  color: #374151;
 }
 
 .empty-state p {
+  margin: 0 0 24px 0;
   font-size: 16px;
+}
+
+.btn-add-large {
+  padding: 16px 32px;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 18px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-add-large:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
+}
+
+.btn-add:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.devices-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 20px;
+}
+
+.device-card {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.device-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.device-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 20px;
+  gap: 12px;
+}
+
+.device-icon {
+  font-size: 32px;
+  flex-shrink: 0;
+}
+
+.device-info {
+  flex: 1;
+}
+
+.device-info h3 {
+  margin: 0 0 4px 0;
+  font-size: 18px;
+  color: #1f2937;
+}
+
+.android-id {
   margin: 0;
+  font-size: 12px;
+  color: #6b7280;
+  font-family: 'Courier New', monospace;
+}
+
+.status-badge {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.status-badge.online {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.status-badge.offline {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.status-badge.idle {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.device-details {
+  border-top: 1px solid #e5e7eb;
+  padding-top: 15px;
+  margin-bottom: 15px;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  font-size: 14px;
+}
+
+.detail-row .label {
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.detail-row .value {
+  color: #1f2937;
+}
+
+.table-number {
+  background: #dbeafe;
+  color: #1e40af;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.not-assigned {
+  color: #9ca3af;
+  font-style: italic;
+}
+
+.battery {
+  font-weight: 600;
+}
+
+.battery.high {
+  color: #059669;
+}
+
+.battery.medium {
+  color: #d97706;
+}
+
+.battery.low {
+  color: #dc2626;
+}
+
+.device-actions {
+  display: flex;
+  gap: 10px;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 15px;
+}
+
+.btn-assign,
+.btn-info {
+  flex: 1;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-assign {
+  background: #3b82f6;
+  color: white;
+}
+
+.btn-assign:hover:not(:disabled) {
+  background: #2563eb;
+}
+
+.btn-info {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.btn-info:hover {
+  background: #e5e7eb;
+}
+
+/* Модальные окна */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+.modal-content {
+  background: white;
+  border-radius: 16px;
+  width: 90%;
+  max-width: 500px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  animation: modalAppear 0.3s ease-out;
+}
+
+@keyframes modalAppear {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 25px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #1f2937;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 20px;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 5px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.close-btn:hover {
+  background: #f3f4f6;
+}
+
+.modal-body {
+  padding: 25px;
+}
+
+.device-name {
+  margin: 0 0 5px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.android-id-small {
+  margin: 0 0 20px 0;
+  font-size: 12px;
+  color: #6b7280;
+  font-family: 'Courier New', monospace;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  color: #374151;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.form-input {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: border-color 0.3s;
+  box-sizing: border-box;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+}
+
+.form-group small {
+  display: block;
+  margin-top: 5px;
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.error-message {
+  padding: 12px;
+  background: #fee2e2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  color: #dc2626;
+  font-size: 14px;
+  margin-top: 15px;
+}
+
+.modal-footer {
+  display: flex;
+  gap: 10px;
+  padding: 20px 25px;
+  background: #f9fafb;
+  border-top: 1px solid #e5e7eb;
+  border-radius: 0 0 16px 16px;
+}
+
+.btn-cancel,
+.btn-register,
+.btn-assign-confirm {
+  flex: 1;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-cancel {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.btn-cancel:hover {
+  background: #e5e7eb;
+}
+
+.btn-register,
+.btn-assign-confirm {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+}
+
+.btn-register:hover:not(:disabled),
+.btn-assign-confirm:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.btn-register:disabled,
+.btn-assign-confirm:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+  transform: none;
 }
 
 @media (max-width: 768px) {
-  .header {
-    flex-direction: column;
-    gap: 12px;
-    align-items: stretch;
-  }
-
-  .header-info {
-    justify-content: center;
-  }
-
   .devices-grid {
     grid-template-columns: 1fr;
-    padding: 16px;
-    gap: 16px;
   }
 
-  .device-actions {
-    flex-direction: column;
+  .modal-content {
+    width: 95%;
+    margin: 10px;
   }
 }
 </style>

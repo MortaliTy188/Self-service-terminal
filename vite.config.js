@@ -14,16 +14,88 @@ export default defineConfig({
   server: {
     host: '127.0.0.1',
     port: 3000,
-    allowedHosts: ['m7cz0y3jhp9i.share.zrok.io'],
+    allowedHosts: ['yuorur0ucfs2.share.zrok.io'],
     proxy: {
       '/api': {
         target: 'http://83.222.9.90:8080',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ''),
+        secure: false,
+      },
+      '/admin': {
+        target: 'http://83.222.9.90:8080',
+        changeOrigin: true,
+        secure: false,
+        bypass(req) {
+          // Не проксировать если это навигация браузера (HTML)
+          if (req.headers.accept?.includes('text/html')) {
+            return req.url
+          }
+        },
+      },
+      '/devices': {
+        target: 'http://83.222.9.90:8080',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/menu': {
+        target: 'http://83.222.9.90:8080',
+        changeOrigin: true,
+        secure: false,
+        bypass(req) {
+          if (req.headers.accept?.includes('text/html')) {
+            return req.url
+          }
+        },
+      },
+      '/categories': {
+        target: 'http://83.222.9.90:8080',
+        changeOrigin: true,
+        secure: false,
+        bypass(req) {
+          if (req.headers.accept?.includes('text/html')) {
+            return req.url
+          }
+        },
+      },
+      '/orders': {
+        target: 'http://83.222.9.90:8080',
+        changeOrigin: true,
+        secure: false,
+        bypass(req) {
+          // НЕ проксировать если это навигация браузера к странице /orders
+          if (req.headers.accept?.includes('text/html')) {
+            console.log('🔄 Пропускаем прокси для навигации:', req.url)
+            return req.url // Пропустить прокси, вернуть в SPA
+          }
+        },
+      },
+      '/cart': {
+        target: 'http://83.222.9.90:8080',
+        changeOrigin: true,
+        secure: false,
+        bypass(req) {
+          if (req.headers.accept?.includes('text/html')) {
+            return req.url
+          }
+        },
+      },
+      '/tables': {
+        target: 'http://83.222.9.90:8080',
+        changeOrigin: true,
+        secure: false,
+        bypass(req) {
+          if (req.headers.accept?.includes('text/html')) {
+            return req.url
+          }
+        },
+      },
+      '/sync': {
+        target: 'http://83.222.9.90:8080',
+        changeOrigin: true,
         secure: false,
       },
     },
   },
   publicDir: 'public',
-  assetsInclude: ['**/*.json']
+  assetsInclude: ['**/*.json'],
 })

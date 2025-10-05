@@ -4,7 +4,7 @@ import { useApiConfigStore } from './apiConfig'
 
 export const useAuthStore = defineStore('auth', () => {
   const apiConfigStore = useApiConfigStore()
-  
+
   // State
   const isAuthenticated = ref(false)
   const sessionId = ref(null)
@@ -20,17 +20,45 @@ export const useAuthStore = defineStore('auth', () => {
     return Date.now() < sessionExpiry.value
   })
 
+  // Загрузка сохраненной админской сессии из localStorage
+  const loadSessionFromStorage = () => {
+    try {
+      const savedSession = localStorage.getItem('admin_session')
+      if (savedSession) {
+        const sessionData = JSON.parse(savedSession)
+
+        // Проверяем, что сессия не истекла
+        if (sessionData.sessionExpiry && Date.now() < sessionData.sessionExpiry) {
+          sessionId.value = sessionData.sessionId
+          sessionExpiry.value = sessionData.sessionExpiry
+          isAuthenticated.value = true
+          console.log('🔄 Админская сессия восстановлена из localStorage')
+          console.log('🔑 Session ID:', sessionId.value)
+          console.log('⏰ Действует до:', new Date(sessionExpiry.value))
+          return true
+        } else {
+          console.log('⚠️ Сохраненная админская сессия истекла')
+          localStorage.removeItem('admin_session')
+        }
+      }
+    } catch (err) {
+      console.error('❌ Ошибка загрузки админской сессии:', err)
+      localStorage.removeItem('admin_session')
+    }
+    return false
+  }
+
   // Actions
   const verifyAdminKey = async (adminKey) => {
     try {
-      console.log('Проверка админ-ключа на сервере...')
+      console.log('Авторизация администратора на сервере...')
 
-      const response = await fetch(`${apiConfigStore.baseUrl}/admin/verify`, {
+      const response = await fetch(apiConfigStore.getSecureUrl('/admin/login'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ adminKey }),
+        body: JSON.stringify({ password: adminKey }),
       })
 
       if (!response.ok) {
@@ -46,20 +74,45 @@ export const useAuthStore = defineStore('auth', () => {
         sessionExpiry.value = expiryDate.getTime()
         isAuthenticated.value = true
 
-        console.log('Админ-ключ успешно подтвержден сервером')
+        // Сохраняем сессию в localStorage для планшетов
+        localStorage.setItem(
+          'admin_session',
+          JSON.stringify({
+            sessionId: sessionId.value,
+            sessionExpiry: sessionExpiry.value,
+          }),
+        )
+
+        console.log('Администратор успешно авторизован')
+        console.log('🔑 Session ID сохранен:', sessionId.value)
+        console.log('⏰ Срок действия:', new Date(sessionExpiry.value))
+        console.log('💾 Админская сессия сохранена в localStorage')
+
+        // Регистрируем отложенное устройство, если есть
+        try {
+          const { useDeviceStore } = await import('./device')
+          const deviceStore = useDeviceStore()
+          await deviceStore.registerPendingDevice()
+
+          // Обновляем информацию об устройстве (в т.ч. shortId)
+          await deviceStore.refreshDeviceInfo()
+        } catch (err) {
+          console.log('ℹ️ Нет отложенной регистрации устройства или ошибка:', err.message)
+        }
+
         return {
           success: true,
           message: result.message || 'Доступ к админ-панели получен',
         }
       } else {
-        console.log('Сервер отклонил админ-ключ')
+        console.log('Сервер отклонил пароль администратора')
         return {
           success: false,
-          error: result.message || 'Неверный админ-ключ',
+          error: result.message || 'Неверный пароль администратора',
         }
       }
     } catch (error) {
-      console.error('Ошибка при проверке админ-ключа на сервере:', error)
+      console.error('Ошибка при авторизации администратора:', error)
       return {
         success: false,
         error: 'Ошибка подключения к серверу',
@@ -68,18 +121,18 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   const promptForAdminKey = async () => {
-    const adminKey = prompt('Введите админ-ключ для доступа к панели управления:')
+    const adminPassword = prompt('Введите пароль администратора для доступа к панели управления:')
 
-    if (!adminKey) {
+    if (!adminPassword) {
       return { success: false, cancelled: true }
     }
 
-    if (adminKey.trim().length < 3) {
-      alert('Админ-ключ слишком короткий')
-      return { success: false, error: 'Слишком короткий ключ' }
+    if (adminPassword.trim().length < 3) {
+      alert('Пароль администратора слишком короткий')
+      return { success: false, error: 'Слишком короткий пароль' }
     }
 
-    return await verifyAdminKey(adminKey.trim())
+    return await verifyAdminKey(adminPassword.trim())
   }
 
   const validateSession = async () => {
@@ -96,7 +149,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     // Дополнительно проверяем на сервере
     try {
-      const response = await fetch(`${apiConfigStore.baseUrl}/admin/validate-session`, {
+      const response = await fetch(apiConfigStore.getSecureUrl('/admin/validate-session'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -159,5 +212,6 @@ export const useAuthStore = defineStore('auth', () => {
     validateSession,
     logout,
     checkAdminAccess,
+    loadSessionFromStorage,
   }
 })

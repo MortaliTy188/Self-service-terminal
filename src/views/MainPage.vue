@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import AppHeader from '@/components/AppHeader.vue'
-import { useWaiterStore, useOrdersStore, useMenuStore } from '@/stores'
+import { useWaiterStore, useOrdersStore, useMenuStore, useDeviceStore } from '@/stores'
 import {
   CategoryList,
   FoodGrid,
@@ -18,6 +18,7 @@ import {
 const waiterStore = useWaiterStore()
 const ordersStore = useOrdersStore()
 const menuStore = useMenuStore()
+const deviceStore = useDeviceStore()
 
 // Local state
 const selectedCategory = ref(null) // null означает "Все категории"
@@ -32,6 +33,14 @@ const selectedFoodItem = ref(null)
 const cartItems = computed(() => ordersStore.cartItems)
 const lastOrder = computed(() => ordersStore.lastOrder)
 const isWaiterLoading = computed(() => waiterStore.isLoading)
+
+// Номер стола из устройства
+const tableNumber = computed(() => {
+  if (deviceStore.shortId) {
+    return `Стол ${deviceStore.shortId}`
+  }
+  return 'Номер стола'
+})
 
 // Event handlers
 const selectCategory = (categoryId) => {
@@ -197,7 +206,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <AppHeader title="Главная страница" table-number="Номер стола" />
+  <AppHeader title="Меню" :table-number="tableNumber" />
   <main>
     <div class="main-container">
       <div class="main-container-left">

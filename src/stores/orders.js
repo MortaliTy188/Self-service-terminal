@@ -3,14 +3,33 @@ import { ref, computed } from 'vue'
 import { useMainStore } from './main'
 import { useMenuStore } from './menu'
 import { useApiConfigStore } from './apiConfig'
+import { useDeviceStore } from './device'
+import { useAuthStore } from './auth'
 
 export const useOrdersStore = defineStore('orders', () => {
   const mainStore = useMainStore()
   const apiConfigStore = useApiConfigStore()
+  const deviceStore = useDeviceStore()
+  const authStore = useAuthStore()
 
   // Получаем доступ к menuStore для поиска информации о товарах
   const getMenuStore = () => {
     return useMenuStore()
+  }
+
+  // Вспомогательная функция для получения table_id устройства
+  const getDeviceTableId = () => {
+    console.log('🔍 Проверяем shortId устройства:', deviceStore.shortId)
+    console.log('🔍 Полная информация об устройстве:', {
+      androidId: deviceStore.androidId,
+      shortId: deviceStore.shortId,
+      isRegistered: deviceStore.isRegistered,
+      deviceToken: deviceStore.deviceToken,
+    })
+
+    const tableId = deviceStore.shortId || '22' // fallback на '1' если нет назначенного стола
+    console.log(`📱 Используем table_id устройства: ${tableId}`)
+    return tableId
   }
 
   // State
@@ -80,7 +99,7 @@ export const useOrdersStore = defineStore('orders', () => {
 
     try {
       // Формируем URL с параметрами фильтрации
-      let url = `${apiConfigStore.baseUrl}/orders`
+      let url = apiConfigStore.getSecureUrl('/orders')
       const queryParams = []
 
       if (filters.status) {
@@ -105,11 +124,23 @@ export const useOrdersStore = defineStore('orders', () => {
 
       console.log('📋 Загружаем заказы с сервера:', url)
 
+      const headers = {
+        'Content-Type': 'application/json',
+      }
+
+      // Добавляем заголовок сессии администратора, если он есть
+      if (authStore.sessionId) {
+        headers['X-Admin-Session'] = authStore.sessionId
+        console.log('✅ Добавлен заголовок X-Admin-Session:', authStore.sessionId)
+      } else {
+        console.warn('⚠️ Нет sessionId для авторизации запроса заказов')
+      }
+
+      console.log('📤 Заголовки запроса:', headers)
+
       const response = await fetch(url, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
       })
 
       if (!response.ok) {
@@ -224,21 +255,26 @@ export const useOrdersStore = defineStore('orders', () => {
     return await fetchOrders({ limit, offset })
   }
 
-  const addToCartServer = async (productId, quantity = 1) => {
+  const addToCartServer = async (productId, quantity = 1, tableId = null) => {
     try {
+      // Используем переданный tableId или получаем от устройства
+      const actualTableId = tableId || getDeviceTableId()
+
       console.log(`🛒 Добавляем товар в корзину через API:`)
       console.log(`   productId: ${productId} (тип: ${typeof productId})`)
       console.log(`   quantity: ${quantity} (тип: ${typeof quantity})`)
+      console.log(`   tableId: ${actualTableId}`)
 
       const requestBody = {
         menu_item_id: productId,
         qty: quantity,
+        table_id: actualTableId,
       }
 
       console.log('📤 Отправляем на сервер:', requestBody)
       console.log('📤 JSON строка:', JSON.stringify(requestBody))
 
-      const response = await fetch(`${apiConfigStore.baseUrl}/cart/add`, {
+      const response = await fetch(apiConfigStore.getSecureUrl('/cart/add'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -332,15 +368,19 @@ export const useOrdersStore = defineStore('orders', () => {
     })
   }
 
-  const removeFromCartServer = async (menuItemId) => {
+  const removeFromCartServer = async (menuItemId, tableId = null) => {
     try {
+      // Используем переданный tableId или получаем от устройства
+      const actualTableId = tableId || getDeviceTableId()
+
       const requestBody = {
         menu_item_id: menuItemId,
+        table_id: actualTableId,
       }
 
       console.log('🗑️ Удаляем товар из корзины через API:', requestBody)
 
-      const response = await fetch(`${apiConfigStore.baseUrl}/cart/remove`, {
+      const response = await fetch(apiConfigStore.getSecureUrl('/cart/remove'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -461,10 +501,13 @@ export const useOrdersStore = defineStore('orders', () => {
     }
   }
 
-  const fetchCart = async () => {
+  const fetchCart = async (tableId = null) => {
     try {
-      console.log(`🛒 Загружаем корзину с сервера: ${apiConfigStore.baseUrl}/cart`)
-      const response = await fetch(`${apiConfigStore.baseUrl}/cart`)
+      // Используем переданный tableId или получаем от устройства
+      const actualTableId = tableId || getDeviceTableId()
+      const cartUrl = apiConfigStore.getSecureUrl(`/cart?table_id=${actualTableId}`)
+      console.log(`🛒 Загружаем корзину с сервера: ${cartUrl}`)
+      const response = await fetch(cartUrl)
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
@@ -494,22 +537,73 @@ export const useOrdersStore = defineStore('orders', () => {
       throw new Error('Корзина пуста')
     }
 
+    // Если устройство зарегистрировано и есть админская сессия, используем device API
+    if (deviceStore.isDeviceReady) {
+      console.log('📱 Создание заказа через Device API')
+
+      const orderData = {
+        items: currentCart.value.map((item) => ({
+          menu_item_id: item.id,
+          qty: item.quantity,
+          price: item.price,
+        })),
+        total: cartTotal.value,
+      }
+
+      const result = await deviceStore.createDeviceOrder(orderData)
+
+      if (result.success) {
+        // Создаем локальный объект заказа для отображения
+        const newOrder = {
+          id: result.data.order_id || `ord_${Date.now()}`,
+          orderDate: new Date().toLocaleDateString('ru-RU'),
+          orderTime: new Date().toLocaleTimeString('ru-RU', {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+          orderType: 'За столом',
+          tableNumber: deviceStore.shortId || '-',
+          tableId: deviceStore.shortId,
+          items: [...currentCart.value],
+          itemsText: currentCart.value
+            .map((item) => `${item.quantity}x ${item.name || item.title}`)
+            .join(', '),
+          status: result.data.status || 'pending',
+          totalPrice: cartTotal.value,
+          totalQuantity: cartItemsCount.value,
+          createdAt: new Date().toISOString(),
+          customerName: orderDetails.customerName || '',
+          specialRequests: orderDetails.specialRequests || '',
+          serverData: result.data,
+        }
+
+        orders.value.unshift(newOrder)
+        lastOrder.value = newOrder
+        clearCart()
+
+        return newOrder
+      } else {
+        throw new Error(result.error || 'Ошибка создания заказа')
+      }
+    }
+
+    // Используем обычный API для браузера
     isLoading.value = true
 
     try {
-      // Генерируем случайный table_id от 11 до 20
-      const randomTableId = Math.floor(Math.random() * 10) + 11
+      // Используем table_id устройства
+      const deviceTableId = getDeviceTableId()
 
       // Используем API согласно postman_collection "Create Order with Table ID"
       const requestBody = {
         order_id: `ord_${Date.now()}`,
-        table_number: orderDetails.tableNumber || 5,
-        table_id: randomTableId.toString(),
+        table_number: orderDetails.tableNumber || parseInt(deviceTableId) || 5,
+        table_id: deviceTableId,
       }
 
       console.log('🛒 Создаем заказ через API:', requestBody)
 
-      const response = await fetch(`${apiConfigStore.baseUrl}/cart/checkout`, {
+      const response = await fetch(apiConfigStore.getSecureUrl('/cart/checkout'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

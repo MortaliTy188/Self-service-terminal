@@ -5,7 +5,7 @@ import defaultSplashImage from '@/assets/mainBackground.png'
 
 export const useSettingsStore = defineStore('settings', () => {
   const apiConfigStore = useApiConfigStore()
-  
+
   // State
   const splashSettings = ref({
     currentImage: '',
@@ -21,7 +21,7 @@ export const useSettingsStore = defineStore('settings', () => {
   })
 
   // Computed property для динамического URL
-  const serverUrl = computed(() => apiConfigStore.baseUrl)
+  const serverUrl = computed(() => apiConfigStore.getSecureUrl())
 
   const systemSettings = ref({
     language: 'ru',

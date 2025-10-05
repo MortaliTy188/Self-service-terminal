@@ -1,0 +1,145 @@
+{
+  "info": {
+    "_postman_id": "b1a9f6d2-3f4a-4b2b-9f8a-1234567890ab",
+    "name": "Restaurant Self-Order - Admin Auth & Devices",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Коллекция для тестирования авторизации админ-панели и получения списка устройств"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://83.222.9.90:8080",
+      "type": "string"
+    },
+    {
+      "key": "X-Admin-Session",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Admin / Login",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"password\": \"admin\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/admin/login",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "admin",
+            "login"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var json = {};",
+              "try { json = pm.response.json(); } catch(e) { }",
+              "pm.test('Response status is 200', function() { pm.expect(pm.response.code).to.be.oneOf([200,201]); });",
+              "pm.test('Login returned success true', function() { pm.expect(json.success).to.equal(true); });",
+              "if (json.sessionId) { pm.environment.set('X-Admin-Session', json.sessionId); pm.test('Saved X-Admin-Session', function() { pm.expect(pm.environment.get('X-Admin-Session')).to.not.be.empty; }); }"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get All Devices (no auth)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/devices",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "devices"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200 or 401', function() { pm.expect([200,401]).to.include(pm.response.code); });",
+              "// If 200, ensure response is an array",
+              "if (pm.response.code === 200) {",
+              "  try { var body = pm.response.json(); pm.test('Body is array', function() { pm.expect(body).to.be.an('array'); }); } catch(e) { pm.test('Response JSON parseable', function() { throw e; }); }",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get All Devices (with admin session)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Admin-Session",
+            "value": "{{X-Admin-Session}}"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/devices",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "devices"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200', function() { pm.expect(pm.response.code).to.equal(200); });",
+              "pm.test('Body is array', function() { var body = pm.response.json(); pm.expect(body).to.be.an('array'); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    }
+  ]
+}
