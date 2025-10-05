@@ -53,42 +53,84 @@
         </div>
 
         <div class="popup-content">
+          <!-- Секция смены пароля -->
           <div class="form-section">
-            <h3>Администратор</h3>
-            <div class="form-group">
-              <label for="adminLogin">Логин администратора</label>
-              <input
-                id="adminLogin"
-                v-model="accountSettings.adminLogin"
-                type="text"
-                class="form-input"
-                placeholder="admin"
-              />
-            </div>
-            <div class="form-group">
-              <label for="adminPassword">Пароль администратора</label>
-              <input
-                id="adminPassword"
-                v-model="accountSettings.adminPassword"
-                type="password"
-                class="form-input"
-                placeholder="••••••••"
-              />
-            </div>
-          </div>
+            <h3>Смена пароля</h3>
 
-          <div class="form-section">
-            <h3>Официант</h3>
             <div class="form-group">
-              <label for="waiterCode">Код доступа официанта</label>
-              <input
-                id="waiterCode"
-                v-model="accountSettings.waiterCode"
-                type="text"
-                class="form-input"
-                placeholder="1234"
-              />
+              <label for="oldPassword">Текущий пароль</label>
+              <div class="password-input-group">
+                <input
+                  id="oldPassword"
+                  v-model="passwordChange.oldPassword"
+                  :type="passwordChange.showOldPassword ? 'text' : 'password'"
+                  class="form-input"
+                  placeholder="Введите текущий пароль"
+                />
+                <button
+                  type="button"
+                  class="password-toggle"
+                  @click="passwordChange.showOldPassword = !passwordChange.showOldPassword"
+                >
+                  {{ passwordChange.showOldPassword ? '🙈' : '👁️' }}
+                </button>
+              </div>
             </div>
+
+            <div class="form-group">
+              <label for="newPassword">Новый пароль</label>
+              <div class="password-input-group">
+                <input
+                  id="newPassword"
+                  v-model="passwordChange.newPassword"
+                  :type="passwordChange.showNewPassword ? 'text' : 'password'"
+                  class="form-input"
+                  placeholder="Введите новый пароль"
+                />
+                <button
+                  type="button"
+                  class="password-toggle"
+                  @click="passwordChange.showNewPassword = !passwordChange.showNewPassword"
+                >
+                  {{ passwordChange.showNewPassword ? '🙈' : '👁️' }}
+                </button>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="confirmPassword">Подтвердите новый пароль</label>
+              <div class="password-input-group">
+                <input
+                  id="confirmPassword"
+                  v-model="passwordChange.confirmPassword"
+                  :type="passwordChange.showConfirmPassword ? 'text' : 'password'"
+                  class="form-input"
+                  placeholder="Повторите новый пароль"
+                />
+                <button
+                  type="button"
+                  class="password-toggle"
+                  @click="passwordChange.showConfirmPassword = !passwordChange.showConfirmPassword"
+                >
+                  {{ passwordChange.showConfirmPassword ? '🙈' : '👁️' }}
+                </button>
+              </div>
+            </div>
+
+            <div class="password-actions">
+              <button
+                class="btn-change-password"
+                @click="handleChangePassword"
+                :disabled="passwordChange.isChanging || !canChangePassword"
+              >
+                {{ passwordChange.isChanging ? 'Изменение...' : 'Сменить пароль' }}
+              </button>
+            </div>
+
+            <div v-if="passwordChange.error" class="error-message">
+              {{ passwordChange.error }}
+            </div>
+            <div v-if="passwordChange.success" class="success-message">Пароль успешно изменён!</div>
           </div>
 
           <div class="popup-actions">
@@ -270,7 +312,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useSplashSettings } from '@/hooks'
-import { useSettingsStore, useApiConfigStore } from '@/stores'
+import { useSettingsStore, useApiConfigStore, useAuthStore } from '@/stores'
 import placeholderImageSrc from '@/assets/mainBackground.png'
 import ServerModeSelector from './ServerModeSelector.vue'
 
@@ -279,6 +321,7 @@ const emit = defineEmits(['save-settings'])
 // Stores
 const settingsStore = useSettingsStore()
 const apiConfigStore = useApiConfigStore()
+const authStore = useAuthStore()
 
 // Хук для управления настройками заставки
 const {
@@ -304,6 +347,22 @@ const accountSettings = ref({
   adminLogin: 'admin',
   adminPassword: '',
   waiterCode: '1234',
+})
+
+// Состояние для показа пароля администратора
+const showAdminPassword = ref(false)
+
+// Состояние для смены пароля
+const passwordChange = ref({
+  oldPassword: '',
+  newPassword: '',
+  confirmPassword: '',
+  showOldPassword: false,
+  showNewPassword: false,
+  showConfirmPassword: false,
+  isChanging: false,
+  error: '',
+  success: false,
 })
 
 // Локальная копия API конфигурации для редактирования
@@ -349,9 +408,36 @@ const openSplashSettings = () => {
   showSplashPopup.value = true
 }
 
+// Computed для проверки возможности смены пароля
+const canChangePassword = computed(() => {
+  return (
+    passwordChange.value.oldPassword.length >= 3 &&
+    passwordChange.value.newPassword.length >= 3 &&
+    passwordChange.value.newPassword === passwordChange.value.confirmPassword
+  )
+})
+
 // Функции для закрытия попапов
 const closeAccountPopup = () => {
   showAccountPopup.value = false
+  // Сбрасываем состояние смены пароля при закрытии
+  resetPasswordChangeForm()
+}
+
+const resetPasswordChangeForm = () => {
+  passwordChange.value = {
+    oldPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+    showOldPassword: false,
+    showNewPassword: false,
+    showConfirmPassword: false,
+    isChanging: false,
+    error: '',
+    success: false,
+  }
+  // Также сбрасываем показ пароля администратора
+  showAdminPassword.value = false
 }
 
 const closeApiPopup = () => {
@@ -369,6 +455,48 @@ const saveAccountSettings = () => {
   // Здесь будет API вызов для сохранения настроек аккаунта
   emit('save-settings', { type: 'account', data: accountSettings.value })
   closeAccountPopup()
+}
+
+// Функция смены пароля
+const handleChangePassword = async () => {
+  passwordChange.value.error = ''
+  passwordChange.value.success = false
+
+  // Валидация
+  if (passwordChange.value.newPassword !== passwordChange.value.confirmPassword) {
+    passwordChange.value.error = 'Пароли не совпадают'
+    return
+  }
+
+  if (passwordChange.value.newPassword.length < 3) {
+    passwordChange.value.error = 'Новый пароль должен содержать минимум 3 символа'
+    return
+  }
+
+  passwordChange.value.isChanging = true
+
+  try {
+    const result = await authStore.changePassword(
+      passwordChange.value.oldPassword,
+      passwordChange.value.newPassword,
+    )
+
+    if (result.success) {
+      passwordChange.value.success = true
+      passwordChange.value.error = ''
+      // Очищаем поля после успешной смены
+      setTimeout(() => {
+        resetPasswordChangeForm()
+      }, 2000)
+    } else {
+      passwordChange.value.error = result.error || 'Ошибка смены пароля'
+    }
+  } catch (error) {
+    passwordChange.value.error = 'Произошла ошибка при смене пароля'
+    console.error('Ошибка смены пароля:', error)
+  } finally {
+    passwordChange.value.isChanging = false
+  }
 }
 
 const saveApiConfiguration = async () => {
@@ -875,6 +1003,81 @@ onMounted(async () => {
   background: #9ca3af;
   cursor: not-allowed;
   opacity: 0.6;
+}
+
+/* Стили для смены пароля */
+.password-input-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.password-input-group .form-input {
+  flex: 1;
+}
+
+.password-toggle {
+  background: none;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.2s;
+  min-width: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.password-toggle:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.password-actions {
+  margin-top: 15px;
+}
+
+.btn-change-password {
+  width: 100%;
+  padding: 12px 20px;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-change-password:hover:not(:disabled) {
+  background: #2563eb;
+}
+
+.btn-change-password:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.error-message {
+  margin-top: 10px;
+  padding: 10px;
+  background: #fee2e2;
+  color: #dc2626;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.success-message {
+  margin-top: 10px;
+  padding: 10px;
+  background: #d1fae5;
+  color: #065f46;
+  border-radius: 6px;
+  font-size: 14px;
 }
 
 @media (max-width: 768px) {

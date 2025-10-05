@@ -25,7 +25,12 @@
             </button>
           </div>
         </div>
-        <OrdersTable :orders="filteredOrders" :is-loading="isLoading" :error="error" />
+        <OrdersTable
+          :orders="filteredOrders"
+          :is-loading="isLoading"
+          :error="error"
+          @order-updated="handleOrderUpdated"
+        />
       </template>
 
       <!-- Вкладка меню -->
@@ -344,6 +349,20 @@ const handleToggleItemStatus = async (itemId, isActive) => {
   if (item) {
     item.isActive = isActive
   }
+}
+
+// Обработчик обновления статуса заказа
+const handleOrderUpdated = async (orderId, newStatus) => {
+  console.log('Обновление статуса заказа:', orderId, newStatus)
+
+  // Обновляем заказ в локальном состоянии
+  const order = orders.value.find((order) => order.id === orderId)
+  if (order) {
+    order.status = newStatus
+  }
+
+  // Можно добавить перезагрузку данных с сервера для синхронизации
+  // await loadOrdersData()
 }
 
 const handleAddItem = () => {

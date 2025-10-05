@@ -37,7 +37,7 @@
         </div>
 
         <div class="item-actions">
-          <button class="edit-btn" @click="editItem(item)" title="Редактировать товар">
+          <!-- <button class="edit-btn" @click="editItem(item)" title="Редактировать товар">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
               <path d="M3 17.25V21H6.75L17.81 9.94L14.06 6.19L3 17.25Z" fill="currentColor" />
               <path
@@ -46,14 +46,14 @@
               />
             </svg>
             Изменить
-          </button>
+          </button> -->
 
           <div class="status-toggle">
             <label class="toggle-label">
               <input
                 type="checkbox"
                 :checked="item.isActive !== false"
-                @change="$emit('toggle-status', item.id, $event.target.checked)"
+                @change="toggleItemStatus(item.id, $event.target.checked)"
               />
               <span class="toggle-slider"></span>
               <span class="status-text">
@@ -196,7 +196,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { useMenuStore } from '@/stores'
+import { useMenuStore, useApiConfigStore } from '@/stores'
 import placeholderImage from '@/assets/image 28.png'
 import EditItemPopup from './EditItemPopup.vue'
 import './CategoryManagement.css'
@@ -239,6 +239,7 @@ const editCategoryName = ref('')
 
 // Получаем категории для отображения названий
 const menuStore = useMenuStore()
+const apiConfigStore = useApiConfigStore()
 const categories = computed(() => menuStore.categories || [])
 
 const getCategoryName = (categoryId) => {
@@ -277,6 +278,37 @@ const handleSave = (itemData) => {
   // Передаем данные наверх в OrdersPage для обработки
   emit('save-item', itemData, isEditMode.value)
   closeEditPopup()
+}
+
+// Функция переключения статуса блюда
+const toggleItemStatus = async (itemId, isActive) => {
+  try {
+    const response = await fetch(apiConfigStore.getSecureUrl(`/menu/${itemId}/active`), {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        is_active: isActive,
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const result = await response.json()
+    console.log('Статус блюда успешно изменен:', result)
+
+    // Эмитим событие для обновления данных в родительском компоненте
+    emit('toggle-status', itemId, isActive)
+
+    // Можно добавить уведомление об успехе
+    // alert(`Блюдо ${isActive ? 'активировано' : 'деактивировано'}`)
+  } catch (error) {
+    console.error('Ошибка при изменении статуса блюда:', error)
+    alert(`Ошибка при изменении статуса: ${error.message}`)
+  }
 }
 
 // Функции для управления категориями
@@ -421,7 +453,7 @@ const deleteCategory = async (categoryId) => {
 }
 
 .btn-categories {
-  display: flex;
+  display: none; /* Скрываем кнопку категории */
   align-items: center;
   gap: 8px;
   padding: 10px 20px;
@@ -440,7 +472,7 @@ const deleteCategory = async (categoryId) => {
 }
 
 .btn-add {
-  display: flex;
+  display: none; /* Скрываем кнопку добавления блюда */
   align-items: center;
   gap: 8px;
   padding: 10px 20px;
@@ -584,7 +616,7 @@ const deleteCategory = async (categoryId) => {
 }
 
 .edit-btn {
-  display: flex;
+  display: none; /* Скрываем кнопку редактирования блюда */
   align-items: center;
   gap: 8px;
   padding: 8px 16px;

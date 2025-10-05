@@ -196,6 +196,41 @@ export const useAuthStore = defineStore('auth', () => {
     return await promptForAdminKey()
   }
 
+  const changePassword = async (oldPassword, newPassword) => {
+    if (!sessionId.value) {
+      return { success: false, error: 'Необходима авторизация' }
+    }
+
+    try {
+      const response = await fetch(apiConfigStore.getSecureUrl('/admin/change-password'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Admin-Session': sessionId.value,
+        },
+        body: JSON.stringify({
+          old_password: oldPassword,
+          new_password: newPassword,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const result = await response.json()
+
+      if (result.success) {
+        return { success: true, message: result.message || 'Пароль успешно изменён' }
+      } else {
+        return { success: false, error: result.message || 'Ошибка смены пароля' }
+      }
+    } catch (error) {
+      console.error('Ошибка при смене пароля:', error)
+      return { success: false, error: 'Ошибка подключения к серверу' }
+    }
+  }
+
   return {
     // State
     isAuthenticated,
@@ -213,5 +248,6 @@ export const useAuthStore = defineStore('auth', () => {
     logout,
     checkAdminAccess,
     loadSessionFromStorage,
+    changePassword,
   }
 })

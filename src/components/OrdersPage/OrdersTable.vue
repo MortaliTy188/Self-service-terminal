@@ -11,11 +11,12 @@
           <th>Номер стола</th>
           <th>История заказа</th>
           <th>Статус</th>
+          <th>Действия</th>
         </tr>
       </thead>
       <tbody>
         <tr v-if="orders.length === 0" class="empty-row">
-          <td colspan="6">Нет заказов для отображения</td>
+          <td colspan="7">Нет заказов для отображения</td>
         </tr>
         <tr v-else v-for="order in orders" :key="order.id" class="table-row">
           <td>{{ order.id }}</td>
@@ -36,6 +37,34 @@
               {{ getStatusText(order.status) }}
             </span>
           </td>
+          <td class="actions-cell">
+            <div class="action-buttons">
+              <button
+                v-if="order.status === 'preparing'"
+                @click="updateOrderStatus(order.id, 'ready')"
+                class="btn-ready"
+                title="Отметить как готов к выдаче"
+              >
+                Готов
+              </button>
+              <button
+                v-if="order.status === 'ready'"
+                @click="updateOrderStatus(order.id, 'completed')"
+                class="btn-completed"
+                title="Отметить как выполненный"
+              >
+                Выдан
+              </button>
+              <button
+                v-if="order.status === 'preparing' || order.status === 'ready'"
+                @click="updateOrderStatus(order.id, 'cancelled')"
+                class="btn-cancelled"
+                title="Отменить заказ"
+              >
+                Отменить
+              </button>
+            </div>
+          </td>
         </tr>
       </tbody>
     </table>
@@ -43,7 +72,11 @@
 </template>
 
 <script setup>
-defineProps({
+import { useApiConfigStore } from '@/stores'
+
+const apiConfigStore = useApiConfigStore()
+
+const props = defineProps({
   orders: {
     type: Array,
     required: true,
@@ -58,6 +91,8 @@ defineProps({
   },
 })
 
+const emit = defineEmits(['order-updated'])
+
 // Функция для получения текста статуса
 const getStatusText = (status) => {
   const statusMap = {
@@ -67,6 +102,42 @@ const getStatusText = (status) => {
     cancelled: 'Отменен',
   }
   return statusMap[status] || status
+}
+
+// Функция для обновления статуса заказа
+const updateOrderStatus = async (orderId, newStatus) => {
+  try {
+    const response = await fetch(apiConfigStore.getSecureUrl(`/orders/${orderId}/status`), {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        status: newStatus,
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const result = await response.json()
+    console.log('Статус заказа успешно обновлен:', result)
+
+    // Эмитим событие для обновления данных в родительском компоненте
+    emit('order-updated', orderId, newStatus)
+
+    // Показываем уведомление об успехе
+    const statusTexts = {
+      ready: 'готов к выдаче',
+      completed: 'выполнен',
+      cancelled: 'отменен',
+    }
+    alert(`Заказ #${orderId} отмечен как ${statusTexts[newStatus]}`)
+  } catch (error) {
+    console.error('Ошибка при обновлении статуса заказа:', error)
+    alert(`Ошибка при обновлении статуса: ${error.message}`)
+  }
 }
 </script>
 
@@ -211,5 +282,60 @@ const getStatusText = (status) => {
   padding: 40px 20px;
   font-style: italic;
   color: #666;
+}
+
+/* Стили для кнопок действий */
+.actions-cell {
+  min-width: 200px;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.action-buttons button {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 70px;
+}
+
+.btn-ready {
+  background: #2196f3;
+  color: white;
+}
+
+.btn-ready:hover {
+  background: #1976d2;
+}
+
+.btn-completed {
+  background: #4caf50;
+  color: white;
+}
+
+.btn-completed:hover {
+  background: #388e3c;
+}
+
+.btn-cancelled {
+  background: #f44336;
+  color: white;
+}
+
+.btn-cancelled:hover {
+  background: #d32f2f;
+}
+
+.action-buttons button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>
