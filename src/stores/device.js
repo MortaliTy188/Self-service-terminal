@@ -62,21 +62,13 @@ export const useDeviceStore = defineStore('device', () => {
         'Content-Type': 'application/json',
       }
 
-      // ВРЕМЕННО: Добавляем тестовый заголовок для регистрации устройств
-      // В реальном приложении это должно делаться через админа
-      try {
-        const { useAuthStore } = await import('./auth')
-        const authStore = useAuthStore()
-
-        if (authStore.sessionId) {
-          headers['X-Admin-Session'] = authStore.sessionId
-          console.log('🔑 Используем реальный Admin Session для регистрации')
-        } else {
-          // Для тестирования: пытаемся зарегистрироваться без авторизации
-          console.log('⚠️ Нет Admin Session - пытаемся зарегистрироваться без авторизации')
-        }
-      } catch (err) {
-        console.log('⚠️ AuthStore недоступен, регистрируемся без авторизации')
+      // Добавляем X-Admin-Session если есть админская сессия
+      const authStore = useAuthStore()
+      if (authStore.sessionId) {
+        headers['X-Admin-Session'] = authStore.sessionId
+        console.log('🔑 Используем Admin Session для регистрации устройства')
+      } else {
+        console.log('⚠️ Нет Admin Session для регистрации устройства')
       }
 
       const response = await fetch(apiConfigStore.getSecureUrl('/api/devices/register'), {
@@ -86,8 +78,8 @@ export const useDeviceStore = defineStore('device', () => {
       })
 
       if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`)
+        const errorData = await response.json().catch(() => ({ message: 'Unknown error' }))
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`)
       }
 
       const result = await response.json()
@@ -212,7 +204,7 @@ export const useDeviceStore = defineStore('device', () => {
 
   /**
    * Обновление статуса устройства
-   * @param {Object} statusData - Данные статуса (battery, last_activity)
+   * @param {Object} statusData - Данные статуса (battery, status)
    * @returns {Object} - Результат обновления
    */
   const updateDeviceStatus = async (statusData) => {
@@ -226,7 +218,7 @@ export const useDeviceStore = defineStore('device', () => {
     try {
       const requestBody = {
         battery: statusData.battery || 100,
-        last_activity: statusData.last_activity || new Date().toISOString(),
+        status: statusData.status || 'active',
       }
 
       console.log('📱 Обновление статуса устройства:', requestBody)
@@ -237,14 +229,15 @@ export const useDeviceStore = defineStore('device', () => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${deviceToken.value}`,
+            'Authorization': `Bearer ${deviceToken.value}`,
           },
           body: JSON.stringify(requestBody),
         },
       )
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+        const errorData = await response.json().catch(() => ({ message: 'Unknown error' }))
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`)
       }
 
       const result = await response.json()
@@ -351,17 +344,18 @@ export const useDeviceStore = defineStore('device', () => {
     try {
       console.log('📱 Загрузка списка всех устройств...')
 
-      // Импортируем authStore для получения sessionId
-      const { useAuthStore } = await import('./auth')
       const authStore = useAuthStore()
 
       const headers = {
         'Content-Type': 'application/json',
       }
 
-      // Добавляем заголовок авторизации
+      // Добавляем X-Admin-Session заголовок
       if (authStore.sessionId) {
         headers['X-Admin-Session'] = authStore.sessionId
+        console.log('🔑 Используем Admin Session для получения списка устройств')
+      } else {
+        throw new Error('Требуется авторизация администратора')
       }
 
       const response = await fetch(apiConfigStore.getSecureUrl('/api/devices'), {
@@ -370,8 +364,8 @@ export const useDeviceStore = defineStore('device', () => {
       })
 
       if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`)
+        const errorData = await response.json().catch(() => ({ message: 'Unknown error' }))
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`)
       }
 
       const devices = await response.json()

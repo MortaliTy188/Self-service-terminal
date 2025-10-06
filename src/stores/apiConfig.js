@@ -16,6 +16,7 @@ export const useApiConfigStore = defineStore('apiConfig', () => {
 
   // Режимы работы
   const serverMode = ref('local') // 'local' или 'public'
+  const useProxy = ref(false) // Флаг для использования прокси (для обхода CORS)
 
   // Constants
   const SERVER_CONFIGS = {
@@ -35,11 +36,17 @@ export const useApiConfigStore = defineStore('apiConfig', () => {
   })
 
   const baseUrl = computed(() => {
+    // Если включен режим прокси, используем относительные URL
+    if (useProxy.value && import.meta.env.DEV) {
+      return '' // Относительные URL - проходят через Vite прокси
+    }
+
     // Если приложение запущено через HTTPS (zrok туннель), используем относительные URL для прохождения через Vite прокси
     if (window.location.protocol === 'https:' && window.location.hostname.includes('zrok.io')) {
       return '' // Относительные URL - проходят через Vite прокси
     }
 
+    // В остальных случаях используем прямое подключение к выбранному серверу
     return currentServerConfig.value.url
   })
   const isConfigured = computed(() => {
@@ -70,6 +77,12 @@ export const useApiConfigStore = defineStore('apiConfig', () => {
     }
   }
 
+  const toggleProxy = () => {
+    useProxy.value = !useProxy.value
+    console.log(`🔄 Прокси ${useProxy.value ? 'включен' : 'выключен'}`)
+    localStorage.setItem('useProxy', useProxy.value.toString())
+  }
+
   const loadServerMode = async () => {
     // Сначала проверяем переменные окружения (из .env.local)
     const envMode = import.meta.env.VITE_SERVER_MODE
@@ -91,6 +104,13 @@ export const useApiConfigStore = defineStore('apiConfig', () => {
       console.log(`📂 Загружен режим из localStorage: ${SERVER_CONFIGS[savedMode].name}`)
     } else {
       console.log(`📂 Использован режим по умолчанию: ${SERVER_CONFIGS.local.name}`)
+    }
+
+    // Загружаем настройку прокси
+    const savedProxy = localStorage.getItem('useProxy')
+    if (savedProxy !== null) {
+      useProxy.value = savedProxy === 'true'
+      console.log(`📂 Загружена настройка прокси: ${useProxy.value ? 'включен' : 'выключен'}`)
     }
   }
 
@@ -286,6 +306,7 @@ export const useApiConfigStore = defineStore('apiConfig', () => {
     error,
     lastUpdated,
     serverMode,
+    useProxy,
 
     // Getters
     isConfigured,
@@ -296,6 +317,7 @@ export const useApiConfigStore = defineStore('apiConfig', () => {
     // Actions
     switchServerMode,
     loadServerMode,
+    toggleProxy,
     fetchConfig,
     saveExtendedConfig,
     testConnection,

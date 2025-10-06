@@ -1,15 +1,42 @@
 const BASE_URL = 'http://83.222.9.90:8080'
 
 class ApiClient {
+  constructor() {
+    this.deviceToken = null
+    this.adminSession = null
+  }
+
+  // Установка токена устройства
+  setDeviceToken(token) {
+    this.deviceToken = token
+  }
+
+  // Установка админской сессии
+  setAdminSession(sessionId) {
+    this.adminSession = sessionId
+  }
+
   async request(endpoint, options = {}) {
-    const url = `/api${endpoint}`
+    const url = endpoint.startsWith('/admin') ? endpoint : `/api${endpoint}`
+
+    const headers = {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    }
+
+    // Добавляем X-Device-Token для обычных API запросов
+    if (this.deviceToken && !endpoint.startsWith('/admin')) {
+      headers['X-Device-Token'] = this.deviceToken
+    }
+
+    // Добавляем X-Admin-Session для админских запросов
+    if (this.adminSession && endpoint.startsWith('/admin')) {
+      headers['X-Admin-Session'] = this.adminSession
+    }
 
     try {
       const response = await fetch(url, {
-        headers: {
-          'Content-Type': 'application/json',
-          ...options.headers,
-        },
+        headers,
         ...options,
       })
 
@@ -24,8 +51,55 @@ class ApiClient {
     }
   }
 
+  // Авторизация админа
+  async adminLogin(password) {
+    return this.request('/admin/login', {
+      method: 'POST',
+      body: JSON.stringify({ password }),
+    })
+  }
+
+  // Регистрация устройства
+  async registerDevice(deviceData) {
+    return this.request('/devices/register', {
+      method: 'POST',
+      body: JSON.stringify(deviceData),
+    })
+  }
+
+  // Получение списка устройств (требует админскую сессию)
+  async getDevices() {
+    return this.request('/devices')
+  }
+
+  // Получение информации об устройстве
+  async getDeviceInfo(deviceId) {
+    return this.request(`/devices/${deviceId}`)
+  }
+
+  // Обновление статуса устройства
+  async updateDeviceStatus(deviceId, statusData) {
+    return this.request(`/devices/${deviceId}/status`, {
+      method: 'POST',
+      body: JSON.stringify(statusData),
+    })
+  }
+
+  // Создание заказа
+  async createOrder(orderData) {
+    return this.request('/orders', {
+      method: 'POST',
+      body: JSON.stringify(orderData),
+    })
+  }
+
   async getMenu() {
     return this.request('/menu')
+  }
+
+  // Получение столов
+  async getTables() {
+    return this.request('/tables')
   }
 
   async getCategories() {

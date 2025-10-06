@@ -537,84 +537,61 @@ export const useOrdersStore = defineStore('orders', () => {
       throw new Error('Корзина пуста')
     }
 
-    // Если устройство зарегистрировано и есть админская сессия, используем device API
-    if (deviceStore.isDeviceReady) {
-      console.log('📱 Создание заказа через Device API')
+    isLoading.value = true
+    error.value = null
 
+    try {
+      // ВРЕМЕННО: включаем прокси для обхода CORS
+      if (import.meta.env.DEV && !apiConfigStore.useProxy) {
+        console.log('🔧 Включаем прокси для обхода CORS проблем')
+        apiConfigStore.toggleProxy()
+      }
+
+      // Получаем table_id устройства
+      const deviceTableId = getDeviceTableId()
+
+      // Подготавливаем данные заказа согласно новой документации API
       const orderData = {
+        device_android_id: deviceStore.androidId || "browser_dev_device",
+        table_short_id: deviceTableId,
         items: currentCart.value.map((item) => ({
           menu_item_id: item.id,
           qty: item.quantity,
-          price: item.price,
         })),
         total: cartTotal.value,
       }
 
-      const result = await deviceStore.createDeviceOrder(orderData)
+      console.log('📝 Создание заказа:', orderData)
+      
+      const url = apiConfigStore.getSecureUrl('/api/orders')
+      console.log('🌐 URL для создания заказа:', url)
+      console.log('🔧 Режим разработки:', import.meta.env.DEV)
+      console.log('🔧 baseUrl:', apiConfigStore.baseUrl)
+      console.log('🔧 useProxy:', apiConfigStore.useProxy)
 
-      if (result.success) {
-        // Создаем локальный объект заказа для отображения
-        const newOrder = {
-          id: result.data.order_id || `ord_${Date.now()}`,
-          orderDate: new Date().toLocaleDateString('ru-RU'),
-          orderTime: new Date().toLocaleTimeString('ru-RU', {
-            hour: '2-digit',
-            minute: '2-digit',
-          }),
-          orderType: 'За столом',
-          tableNumber: deviceStore.shortId || '-',
-          tableId: deviceStore.shortId,
-          items: [...currentCart.value],
-          itemsText: currentCart.value
-            .map((item) => `${item.quantity}x ${item.name || item.title}`)
-            .join(', '),
-          status: result.data.status || 'pending',
-          totalPrice: cartTotal.value,
-          totalQuantity: cartItemsCount.value,
-          createdAt: new Date().toISOString(),
-          customerName: orderDetails.customerName || '',
-          specialRequests: orderDetails.specialRequests || '',
-          serverData: result.data,
-        }
+      const headers = {
+        'Content-Type': 'application/json',
+      }
 
-        orders.value.unshift(newOrder)
-        lastOrder.value = newOrder
-        clearCart()
-
-        return newOrder
+      // Используем стандартный Authorization Bearer заголовок
+      if (deviceStore.deviceToken) {
+        headers['Authorization'] = `Bearer ${deviceStore.deviceToken}`
+        console.log('🔑 Используем Authorization Bearer для создания заказа')
       } else {
-        throw new Error(result.error || 'Ошибка создания заказа')
-      }
-    }
-
-    // Используем обычный API для браузера
-    isLoading.value = true
-
-    try {
-      // Используем table_id устройства
-      const deviceTableId = getDeviceTableId()
-
-      // Используем API согласно postman_collection "Create Order with Table ID"
-      const requestBody = {
-        order_id: `ord_${Date.now()}`,
-        table_number: orderDetails.tableNumber || parseInt(deviceTableId) || 5,
-        table_id: deviceTableId,
+        console.log('⚠️ Нет Device Token - создание заказа может не сработать')
       }
 
-      console.log('🛒 Создаем заказ через API:', requestBody)
+      console.log('📤 Заголовки запроса:', headers)
 
-      const response = await fetch(apiConfigStore.getSecureUrl('/cart/checkout'), {
+      const response = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
+        headers,
+        body: JSON.stringify(orderData),
       })
 
       if (!response.ok) {
-        const errorText = await response.text()
-        console.log('❌ Ошибка создания заказа:', errorText)
-        throw new Error(`HTTP error! status: ${response.status}`)
+        const errorData = await response.json().catch(() => ({ message: 'Unknown error' }))
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`)
       }
 
       const result = await response.json()
@@ -622,16 +599,16 @@ export const useOrdersStore = defineStore('orders', () => {
 
       // Создаем локальный объект заказа для отображения
       const newOrder = {
-        id: result.order_id || requestBody.order_id,
+        id: result.order_id || result.id || `ord_${Date.now()}`,
         orderDate: new Date().toLocaleDateString('ru-RU'),
         orderTime: new Date().toLocaleTimeString('ru-RU', {
           hour: '2-digit',
           minute: '2-digit',
         }),
-        orderType: orderDetails.orderType || 'За столом',
-        tableNumber: orderDetails.tableNumber || 5,
-        tableId: requestBody.table_id, // Добавляем table_id
-        items: [...currentCart.value], // Сохраняем полные объекты товаров
+        orderType: 'За столом',
+        tableNumber: deviceTableId,
+        tableId: deviceTableId,
+        items: [...currentCart.value],
         itemsText: currentCart.value
           .map((item) => `${item.quantity}x ${item.name || item.title}`)
           .join(', '),
@@ -641,30 +618,17 @@ export const useOrdersStore = defineStore('orders', () => {
         createdAt: new Date().toISOString(),
         customerName: orderDetails.customerName || '',
         specialRequests: orderDetails.specialRequests || '',
-        serverData: result, // Сохраняем данные с сервера
+        serverData: result,
       }
 
       orders.value.unshift(newOrder)
       lastOrder.value = newOrder
       clearCart()
 
-      mainStore.addNotification({
-        type: 'success',
-        title: 'Заказ оформлен',
-        message: `Заказ №${newOrder.id} создан для стола №${requestBody.table_id}`,
-        duration: 3000,
-      })
-
       return newOrder
     } catch (err) {
+      console.error('❌ Ошибка создания заказа:', err)
       error.value = err.message
-      console.error('Error creating order:', err)
-      mainStore.addNotification({
-        type: 'error',
-        title: 'Ошибка создания заказа',
-        message: err.message,
-        duration: 5000,
-      })
       throw err
     } finally {
       isLoading.value = false

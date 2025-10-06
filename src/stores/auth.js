@@ -62,7 +62,8 @@ export const useAuthStore = defineStore('auth', () => {
       })
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+        const errorData = await response.json()
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`)
       }
 
       const result = await response.json()
@@ -83,8 +84,8 @@ export const useAuthStore = defineStore('auth', () => {
           }),
         )
 
-        console.log('Администратор успешно авторизован')
-        console.log('🔑 Session ID сохранен:', sessionId.value)
+        console.log('✅ Администратор успешно авторизован')
+        console.log('🔑 Session ID:', sessionId.value)
         console.log('⏰ Срок действия:', new Date(sessionExpiry.value))
         console.log('💾 Админская сессия сохранена в localStorage')
 

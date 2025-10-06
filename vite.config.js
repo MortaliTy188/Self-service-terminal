@@ -17,12 +17,26 @@ export default defineConfig({
     allowedHosts: ['yuorur0ucfs2.share.zrok.io'],
     proxy: {
       '/api': {
-        target: 'http://83.222.9.90:8080',
+        target: 'http://localhost:8080', // Изменено на локальный сервер
         changeOrigin: true,
         secure: false,
+        configure: (proxy, _options) => {
+          proxy.on('proxyReq', (proxyReq, req, _res) => {
+            // Передаем все заголовки авторизации
+            if (req.headers['authorization']) {
+              proxyReq.setHeader('Authorization', req.headers['authorization'])
+            }
+            if (req.headers['x-device-token']) {
+              proxyReq.setHeader('X-Device-Token', req.headers['x-device-token'])
+            }
+            if (req.headers['x-admin-session']) {
+              proxyReq.setHeader('X-Admin-Session', req.headers['x-admin-session'])
+            }
+          })
+        },
       },
       '/admin': {
-        target: 'http://83.222.9.90:8080',
+        target: 'http://localhost:8080', // Изменено на локальный сервер
         changeOrigin: true,
         secure: false,
         bypass(req) {
@@ -33,12 +47,12 @@ export default defineConfig({
         },
       },
       '/devices': {
-        target: 'http://83.222.9.90:8080',
+        target: 'http://localhost:8080', // Изменено на локальный сервер
         changeOrigin: true,
         secure: false,
       },
       '/menu': {
-        target: 'http://83.222.9.90:8080',
+        target: 'http://localhost:8080', // Изменено на локальный сервер
         changeOrigin: true,
         secure: false,
         bypass(req) {
@@ -48,7 +62,7 @@ export default defineConfig({
         },
       },
       '/categories': {
-        target: 'http://83.222.9.90:8080',
+        target: 'http://localhost:8080', // Изменено на локальный сервер
         changeOrigin: true,
         secure: false,
         bypass(req) {
@@ -58,7 +72,7 @@ export default defineConfig({
         },
       },
       '/orders': {
-        target: 'http://83.222.9.90:8080',
+        target: 'http://localhost:8080', // Изменено на локальный сервер
         changeOrigin: true,
         secure: false,
         bypass(req) {
@@ -70,7 +84,7 @@ export default defineConfig({
         },
       },
       '/cart': {
-        target: 'http://83.222.9.90:8080',
+        target: 'http://localhost:8080', // Изменено на локальный сервер
         changeOrigin: true,
         secure: false,
         bypass(req) {
@@ -80,7 +94,7 @@ export default defineConfig({
         },
       },
       '/tables': {
-        target: 'http://83.222.9.90:8080',
+        target: 'http://localhost:8080', // Изменено на локальный сервер
         changeOrigin: true,
         secure: false,
         bypass(req) {
@@ -90,7 +104,7 @@ export default defineConfig({
         },
       },
       '/sync': {
-        target: 'http://83.222.9.90:8080',
+        target: 'http://localhost:8080', // Изменено на локальный сервер
         changeOrigin: true,
         secure: false,
       },

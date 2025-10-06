@@ -10,6 +10,7 @@ export const useMenuStore = defineStore('menu', () => {
   // State
   const menuItems = ref([])
   const categories = ref([])
+  const tables = ref([])
   const isLoading = ref(false)
   const error = ref(null)
   const selectedCategory = ref(null)
@@ -81,6 +82,28 @@ export const useMenuStore = defineStore('menu', () => {
     } catch (err) {
       error.value = err.message
       console.error('❌ Ошибка загрузки категорий с сервера:', err)
+    }
+  }
+
+  const fetchTables = async () => {
+    try {
+      console.log('🪑 Загружаем столы с сервера:', apiConfigStore.getSecureUrl('/tables'))
+      const response = await fetch(apiConfigStore.getSecureUrl('/tables'))
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      tables.value = data
+      console.log('✅ Столы успешно загружены с сервера:', {
+        source: apiConfigStore.getSecureUrl('/tables'),
+        tablesCount: data.length,
+        tables: data,
+      })
+    } catch (err) {
+      error.value = err.message
+      console.error('❌ Ошибка загрузки столов с сервера:', err)
     }
   }
 
@@ -178,16 +201,21 @@ export const useMenuStore = defineStore('menu', () => {
     )
   }
 
+  const getTableById = (id) => {
+    return tables.value.find((table) => table.id === id)
+  }
+
   const fetchMenuWithCategories = async () => {
-    console.log('🚀 Начинаем загрузку меню и категорий...')
+    console.log('🚀 Начинаем загрузку меню, категорий и столов...')
     try {
-      await Promise.all([fetchMenu(), fetchCategories()])
-      console.log('🎉 Меню и категории загружены успешно:', {
+      await Promise.all([fetchMenu(), fetchCategories(), fetchTables()])
+      console.log('🎉 Меню, категории и столы загружены успешно:', {
         menuItemsCount: menuItems.value.length,
         categoriesCount: categories.value.length,
+        tablesCount: tables.value.length,
       })
     } catch (error) {
-      console.error('💥 Ошибка при загрузке меню и категорий:', error)
+      console.error('💥 Ошибка при загрузке данных:', error)
     }
   }
 
@@ -203,6 +231,7 @@ export const useMenuStore = defineStore('menu', () => {
     // State
     menuItems,
     categories,
+    tables,
     isLoading,
     error,
     selectedCategory,
@@ -215,12 +244,14 @@ export const useMenuStore = defineStore('menu', () => {
     // Actions
     fetchMenu,
     fetchCategories,
+    fetchTables,
     fetchMenuWithCategories,
     setCurrentCategory,
     clearCategoryFilter,
     getMenuItemById,
     getMenuByCategory,
     getCategoryById,
+    getTableById,
     setSelectedCategory,
     addMenuItem,
     updateMenuItem,
