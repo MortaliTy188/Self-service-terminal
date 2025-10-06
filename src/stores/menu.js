@@ -31,7 +31,7 @@ export const useMenuStore = defineStore('menu', () => {
   })
 
   const availableMenuItems = computed(() => {
-    return menuItems.value.filter((item) => item.is_available !== false)
+    return menuItems.value.filter((item) => item.is_active !== false)
   })
 
   // Actions
@@ -115,6 +115,12 @@ export const useMenuStore = defineStore('menu', () => {
     return menuItems.value.filter((item) => item.category_id === categoryId)
   }
 
+  const getActiveMenuByCategory = (categoryId) => {
+    return menuItems.value.filter(
+      (item) => item.category_id === categoryId && item.is_active !== false,
+    )
+  }
+
   const getCategoryById = (id) => {
     return categories.value.find((category) => category.id === id)
   }
@@ -186,7 +192,7 @@ export const useMenuStore = defineStore('menu', () => {
   const toggleMenuItemAvailability = (id) => {
     const item = getMenuItemById(id)
     if (item) {
-      item.is_available = !item.is_available
+      item.is_active = !item.is_active
     }
   }
 
@@ -250,6 +256,7 @@ export const useMenuStore = defineStore('menu', () => {
     clearCategoryFilter,
     getMenuItemById,
     getMenuByCategory,
+    getActiveMenuByCategory,
     getCategoryById,
     getTableById,
     setSelectedCategory,

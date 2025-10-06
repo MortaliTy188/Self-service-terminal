@@ -52,12 +52,12 @@
             <label class="toggle-label">
               <input
                 type="checkbox"
-                :checked="item.isActive !== false"
+                :checked="item.is_active !== false"
                 @change="toggleItemStatus(item.id, $event.target.checked)"
               />
               <span class="toggle-slider"></span>
               <span class="status-text">
-                {{ item.isActive !== false ? 'Активно' : 'Стоп' }}
+                {{ item.is_active !== false ? 'Активно' : 'Стоп' }}
               </span>
             </label>
           </div>

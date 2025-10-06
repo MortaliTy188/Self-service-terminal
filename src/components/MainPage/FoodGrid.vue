@@ -36,11 +36,11 @@ const error = computed(() => menuStore.error)
 // Вычисляем отфильтрованные элементы на основе выбранной категории
 const filteredItems = computed(() => {
   if (!props.selectedCategory) {
-    // Если категория не выбрана, показываем все блюда
-    return menu.value
+    // Если категория не выбрана, показываем все активные блюда
+    return menu.value.filter((item) => item.is_active !== false)
   }
-  // Фильтруем блюда по выбранной категории
-  return menuStore.getMenuByCategory(props.selectedCategory)
+  // Фильтруем блюда по выбранной категории, только активные
+  return menuStore.getActiveMenuByCategory(props.selectedCategory)
 })
 </script>
 

@@ -41,11 +41,35 @@
           </div>
           <button class="settings-btn" @click="openSplashSettings">Настроить</button>
         </div>
+
+        <!-- Кнопка Синхронизация меню -->
+        <div class="settings-card">
+          <div class="card-icon">🍽️</div>
+          <div class="card-info">
+            <h3>Синхронизация меню</h3>
+            <p>Ручная синхронизация меню с iiko</p>
+          </div>
+          <button class="settings-btn sync-btn" @click="syncMenu" :disabled="isSyncingMenu">
+            {{ isSyncingMenu ? 'Синхронизация...' : 'Синхронизировать' }}
+          </button>
+        </div>
+
+        <!-- Кнопка Синхронизация столов -->
+        <div class="settings-card">
+          <div class="card-icon">🪑</div>
+          <div class="card-info">
+            <h3>Синхронизация столов</h3>
+            <p>Синхронизировать столы с iiko</p>
+          </div>
+          <button class="settings-btn sync-btn" @click="syncTables" :disabled="isSyncingTables">
+            {{ isSyncingTables ? 'Синхронизация...' : 'Синхронизировать' }}
+          </button>
+        </div>
       </div>
     </div>
 
     <!-- Popup для настроек аккаунта -->
-    <div v-if="showAccountPopup" class="popup-overlay" @click="closeAccountPopup">
+    <div v-if="showAccountPopup" class="popup-overlay">
       <div class="settings-popup" @click.stop>
         <div class="popup-header">
           <h2>Настройки аккаунта</h2>
@@ -142,7 +166,7 @@
     </div>
 
     <!-- Popup для настроек API -->
-    <div v-if="showApiPopup" class="popup-overlay" @click="closeApiPopup">
+    <div v-if="showApiPopup" class="popup-overlay">
       <div class="settings-popup" @click.stop>
         <div class="popup-header">
           <h2>Настройки API</h2>
@@ -159,7 +183,7 @@
                 v-model="apiConfig.api_login"
                 type="text"
                 class="form-input"
-                placeholder="89c6102cdede43f8a17dd397a2670d94"
+                placeholder="XXXXXXX—XXXXXX—XXXXX"
               />
             </div>
             <div class="form-group">
@@ -169,7 +193,7 @@
                 v-model="apiConfig.organization_id"
                 type="text"
                 class="form-input"
-                placeholder="fb180a98-1352-480b-916f-8dddde866f3c"
+                placeholder="XXXXXXX—XXXXXX—XXXXX"
               />
             </div>
           </div>
@@ -183,7 +207,7 @@
                 v-model="apiConfig.terminal_group_id"
                 type="text"
                 class="form-input"
-                placeholder="b233cacb-c4ab-fa4b-0199-56337bcb0066"
+                placeholder="XXXXXXX—XXXXXX—XXXXX"
               />
             </div>
             <div class="form-group">
@@ -193,7 +217,7 @@
                 v-model="apiConfig.payment_type_id"
                 type="text"
                 class="form-input"
-                placeholder="09322f46-578a-d210-add7-eec222a08871"
+                placeholder="XXXXXXX—XXXXXX—XXXXX"
               />
             </div>
           </div>
@@ -239,7 +263,7 @@
     </div>
 
     <!-- Popup для настроек заставки -->
-    <div v-if="showSplashPopup" class="popup-overlay" @click="closeSplashPopup">
+    <div v-if="showSplashPopup" class="popup-overlay">
       <div class="settings-popup" @click.stop>
         <div class="popup-header">
           <h2>Изменить заставку</h2>
@@ -273,29 +297,6 @@
                 <p>Нажмите для выбора изображения</p>
                 <span>Поддерживаются форматы: JPG, PNG, GIF</span>
               </div>
-            </div>
-          </div>
-
-          <div class="form-section">
-            <h3>Настройки отображения</h3>
-            <div class="form-group">
-              <label for="splashDuration">Время показа заставки (сек)</label>
-              <input
-                id="splashDuration"
-                v-model="splashSettings.duration"
-                type="number"
-                class="form-input"
-                placeholder="3"
-                min="1"
-                max="10"
-              />
-            </div>
-            <div class="checkbox-group">
-              <label class="checkbox-label">
-                <input type="checkbox" v-model="splashSettings.showOnStartup" />
-                <span class="checkbox-custom"></span>
-                Показывать при запуске приложения
-              </label>
             </div>
           </div>
 
@@ -335,6 +336,10 @@ const {
 const showAccountPopup = ref(false)
 const showApiPopup = ref(false)
 const showSplashPopup = ref(false)
+
+// Состояния синхронизации
+const isSyncingMenu = ref(false)
+const isSyncingTables = ref(false)
 
 // Ссылка на input файла
 const fileInput = ref(null)
@@ -567,6 +572,67 @@ const handleImageUpload = (event) => {
   }
 }
 
+// Функции синхронизации
+const syncMenu = async () => {
+  isSyncingMenu.value = true
+  try {
+    console.log('Запуск синхронизации меню с iiko...')
+    const response = await fetch(apiConfigStore.getSecureUrl('/sync/nomenclature'), {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const result = await response.json()
+    console.log('Синхронизация меню завершена:', result)
+
+    if (result.success) {
+      alert(`Синхронизация меню успешно завершена!\n${result.message || 'Меню обновлено'}`)
+    } else {
+      alert(`Ошибка синхронизации: ${result.message || 'Неизвестная ошибка'}`)
+    }
+  } catch (error) {
+    console.error('Ошибка синхронизации меню:', error)
+    alert(`Ошибка синхронизации меню: ${error.message}`)
+  } finally {
+    isSyncingMenu.value = false
+  }
+}
+
+const syncTables = async () => {
+  isSyncingTables.value = true
+  try {
+    console.log('Запуск синхронизации столов с iiko...')
+    const response = await fetch(apiConfigStore.getSecureUrl('/tables/sync'), {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const result = await response.json()
+    console.log('Синхронизация столов завершена:', result)
+
+    alert(
+      `Синхронизация столов завершена!\n${result.message || 'Столы обновлены'}\nСинхронизировано: ${result.synced_count || 0} столов`,
+    )
+  } catch (error) {
+    console.error('Ошибка синхронизации столов:', error)
+    alert(`Ошибка синхронизации столов: ${error.message}`)
+  } finally {
+    isSyncingTables.value = false
+  }
+}
+
 // Инициализация
 onMounted(async () => {
   console.log('SettingsManagement mounted')
@@ -679,6 +745,23 @@ onMounted(async () => {
   background: #2563eb;
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.sync-btn {
+  background: #16a34a;
+}
+
+.sync-btn:hover:not(:disabled) {
+  background: #15803d;
+  box-shadow: 0 4px 12px rgba(22, 163, 74, 0.4);
+}
+
+.sync-btn:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+  opacity: 0.6;
+  transform: none;
+  box-shadow: none;
 }
 
 .popup-overlay {

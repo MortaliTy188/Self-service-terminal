@@ -229,7 +229,7 @@ export const useDeviceStore = defineStore('device', () => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${deviceToken.value}`,
+            Authorization: `Bearer ${deviceToken.value}`,
           },
           body: JSON.stringify(requestBody),
         },

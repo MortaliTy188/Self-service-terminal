@@ -92,7 +92,7 @@ const getCalories = (item) => {
 </script>
 
 <template>
-  <div v-if="show && item" class="popup-overlay" @click="closePopup">
+  <div v-if="show && item" class="popup-overlay">
     <div class="popup-container" @click.stop>
       <div class="popup-header">
         <div class="header-left">

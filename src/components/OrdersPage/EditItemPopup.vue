@@ -133,7 +133,7 @@
         <div class="form-row">
           <div class="form-group">
             <label class="checkbox-label">
-              <input v-model="editedItem.isActive" type="checkbox" class="form-checkbox" />
+              <input v-model="editedItem.is_active" type="checkbox" class="form-checkbox" />
               <span class="checkbox-text">Активное блюдо</span>
             </label>
           </div>
@@ -204,7 +204,7 @@ const editedItem = ref({
   ingredients: '',
   weight: 0,
   calories: 0,
-  isActive: true,
+  is_active: true,
   isRecommended: false,
   isVegetarian: false,
 })
@@ -231,7 +231,7 @@ watch(
           ingredients: newItem.ingredients || '',
           weight: newItem.weight || 0,
           calories: newItem.calories || 0,
-          isActive: newItem.isActive !== false,
+          is_active: newItem.is_active !== false,
           isRecommended: newItem.isRecommended || false,
           isVegetarian: newItem.isVegetarian || false,
         }
@@ -247,7 +247,7 @@ watch(
           ingredients: '',
           weight: 0,
           calories: 0,
-          isActive: true,
+          is_active: true,
           isRecommended: false,
           isVegetarian: false,
         }

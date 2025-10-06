@@ -217,13 +217,13 @@ const menuFilters = computed(() => {
       value: 'active',
       label: 'Активные',
       icon: '✅',
-      count: items.filter((item) => item.is_available !== false).length,
+      count: items.filter((item) => item.is_active !== false).length,
     },
     {
       value: 'inactive',
       label: 'Неактивные',
       icon: '⛔',
-      count: items.filter((item) => item.is_available === false).length,
+      count: items.filter((item) => item.is_active === false).length,
     },
   ]
 })
@@ -306,9 +306,9 @@ const filteredMenuItems = computed(() => {
   if (activeMenuFilter.value === 'all') {
     return items
   } else if (activeMenuFilter.value === 'active') {
-    return items.filter((item) => item.isActive !== false)
+    return items.filter((item) => item.is_active !== false)
   } else if (activeMenuFilter.value === 'inactive') {
-    return items.filter((item) => item.isActive === false)
+    return items.filter((item) => item.is_active === false)
   } else {
     // Фильтр по категории
     return items.filter((item) => item.category_id === activeMenuFilter.value)
@@ -347,7 +347,7 @@ const handleToggleItemStatus = async (itemId, isActive) => {
   const items = menuItems.value || []
   const item = items.find((item) => item.id === itemId)
   if (item) {
-    item.isActive = isActive
+    item.is_active = isActive
   }
 }
 
