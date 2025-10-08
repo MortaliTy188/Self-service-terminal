@@ -324,6 +324,75 @@ export const useDeviceStore = defineStore('device', () => {
   }
 
   /**
+   * Изменение номера стола у устройства (только для админа)
+   * @param {String} android_id - Android ID устройства
+   * @param {String} short_id - Новый короткий номер стола
+   * @returns {Object} - Результат изменения
+   */
+  const updateDeviceTable = async (android_id, short_id) => {
+    isLoading.value = true
+    error.value = null
+
+    try {
+      const requestBody = {
+        short_id: short_id.toString(),
+      }
+
+      console.log('📱 Изменение номера стола устройства:', android_id, '→', short_id)
+
+      // Получаем заголовки авторизации
+      const headers = {
+        'Content-Type': 'application/json',
+      }
+
+      // Добавляем X-Admin-Session если авторизованы
+      const authStore = useAuthStore()
+      if (authStore.sessionId) {
+        headers['X-Admin-Session'] = authStore.sessionId
+        console.log('🔑 Используем Admin Session для изменения номера стола')
+      }
+
+      const response = await fetch(
+        apiConfigStore.getSecureUrl(`/api/devices/${android_id}/table`),
+        {
+          method: 'PATCH',
+          headers,
+          body: JSON.stringify(requestBody),
+        },
+      )
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`)
+      }
+
+      const result = await response.json()
+      console.log('✅ Номер стола изменен:', result)
+
+      // Если это текущее устройство, обновляем shortId
+      if (android_id === androidId.value) {
+        shortId.value = short_id.toString()
+        saveDeviceToStorage()
+      }
+
+      return {
+        success: true,
+        data: result,
+        message: `Номер стола изменен на ${short_id}`,
+      }
+    } catch (err) {
+      console.error('❌ Ошибка изменения номера стола:', err)
+      error.value = err.message
+      return {
+        success: false,
+        error: err.message,
+      }
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  /**
    * Получение списка всех устройств (только для админа)
    * Требует X-Admin-Session заголовок
    * @param {Boolean} forceRefresh - Принудительное обновление списка
@@ -850,6 +919,7 @@ export const useDeviceStore = defineStore('device', () => {
     updateDeviceInList,
     removeDeviceFromList,
     assignShortId,
+    updateDeviceTable,
     registerPendingDevice,
     refreshDeviceInfo,
   }

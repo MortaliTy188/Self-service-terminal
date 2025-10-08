@@ -1,0 +1,107 @@
+{
+  "info": {
+    "_postman_id": "restaurant-selforde-api-v2",
+    "name": "Restaurant Self-Order API v2",
+    "description": "Коллекция для тестирования всех актуальных endpoint. В каждой категории — описание и последовательность тестирования.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Device Management",
+      "description": "Регистрация, получение, обновление устройств. Тестировать: сначала регистрацию, затем смену стола, затем получение.",
+      "item": [
+        {
+          "name": "Register Device",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\n  \"android_id\": \"test_android_id\",\n  \"model\": \"Lenovo Tab\",\n  \"os_version\": \"13.0\",\n  \"app_version\": \"1.0.0\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/devices/register", "host": ["{{baseUrl}}"], "path": ["api", "devices", "register"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Change Device Table",
+          "request": {
+            "method": "PATCH",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\n  \"short_id\": \"2\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/devices/{{android_id}}/table", "host": ["{{baseUrl}}"], "path": ["api", "devices", "{{android_id}}", "table"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Device Info",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/api/devices/{{android_id}}", "host": ["{{baseUrl}}"], "path": ["api", "devices", "{{android_id}}"] } },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Orders Management",
+      "description": "Создание, получение, обновление заказов. Тестировать: создание заказа, получение по статусу, обновление статуса.",
+      "item": [
+        { "name": "Get All Orders", "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/orders", "host": ["{{baseUrl}}"], "path": ["orders"] } }, "response": [] },
+        { "name": "Get Orders by Status", "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/orders?status=pending", "host": ["{{baseUrl}}"], "path": ["orders"], "query": [ { "key": "status", "value": "pending" } ] } }, "response": [] },
+        { "name": "Update Order Status", "request": { "method": "PATCH", "header": [ { "key": "Content-Type", "value": "application/json" } ], "body": { "mode": "raw", "raw": "{\n  \"status\": \"ready\"\n}" }, "url": { "raw": "{{baseUrl}}/orders/{{orderId}}/status", "host": ["{{baseUrl}}"], "path": ["orders", "{{orderId}}", "status"] } }, "response": [] }
+      ]
+    },
+    {
+      "name": "Admin",
+      "description": "Аутентификация, смена пароля, проверка сессии. Тестировать: логин, смена пароля, проверка сессии.",
+      "item": [
+        { "name": "Admin Login", "request": { "method": "POST", "header": [ { "key": "Content-Type", "value": "application/json" } ], "body": { "mode": "raw", "raw": "{\n  \"password\": \"admin\"\n}" }, "url": { "raw": "{{baseUrl}}/admin/login", "host": ["{{baseUrl}}"], "path": ["admin", "login"] } }, "response": [] },
+        { "name": "Change Admin Password", "request": { "method": "POST", "header": [ { "key": "Content-Type", "value": "application/json" } ], "body": { "mode": "raw", "raw": "{\n  \"old_password\": \"admin\",\n  \"new_password\": \"newpass\"\n}" }, "url": { "raw": "{{baseUrl}}/admin/change-password", "host": ["{{baseUrl}}"], "path": ["admin", "change-password"] } }, "response": [] }
+      ]
+    },
+    {
+      "name": "Menu & Categories",
+      "description": "Работа с меню и категориями. Тестировать: загрузку меню, получение категорий, переключение активности блюда.",
+      "item": [
+        { "name": "Upload Menu", "request": { "method": "POST", "header": [ { "key": "Content-Type", "value": "application/json" } ], "body": { "mode": "raw", "raw": "[ { \"id\": \"menu_test_1\", \"name\": \"Борщ\", \"price\": 250 } ]" }, "url": { "raw": "{{baseUrl}}/menu/upload", "host": ["{{baseUrl}}"], "path": ["menu", "upload"] } }, "response": [] },
+        { "name": "Get Categories", "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/categories", "host": ["{{baseUrl}}"], "path": ["categories"] } }, "response": [] },
+        { "name": "Get Menu", "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/menu", "host": ["{{baseUrl}}"], "path": ["menu"] } }, "response": [] },
+        { "name": "Set Menu Item Active", "request": { "method": "PATCH", "header": [ { "key": "Content-Type", "value": "application/json" } ], "body": { "mode": "raw", "raw": "{\n  \"is_active\": true\n}" }, "url": { "raw": "{{baseUrl}}/menu/{{menuItemId}}/active", "host": ["{{baseUrl}}"], "path": ["menu", "{{menuItemId}}", "active"] } }, "response": [] }
+      ]
+    },
+    {
+      "name": "Tables",
+      "description": "Операции со столами: список, синхронизация, получение по ID, маппинг, статус.",
+      "item": [
+        { "name": "Get All Tables", "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/tables", "host": ["{{baseUrl}}"], "path": ["tables"] } }, "response": [] },
+        { "name": "Sync Tables", "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/tables/sync", "host": ["{{baseUrl}}"], "path": ["tables", "sync"] } }, "response": [] },
+        { "name": "Get Table by ID", "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/tables/{{tableId}}", "host": ["{{baseUrl}}"], "path": ["tables", "{{tableId}}"] } }, "response": [] },
+        { "name": "Get Table Mapping", "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/tables/mapping/{{tableShortId}}", "host": ["{{baseUrl}}"], "path": ["tables", "mapping", "{{tableShortId}}"] } }, "response": [] },
+        { "name": "Get Tables Status", "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/tables/status", "host": ["{{baseUrl}}"], "path": ["tables", "status"] } }, "response": [] }
+      ]
+    },
+    {
+      "name": "Admin (расширенные)",
+      "description": "Дополнительные функции для админки: логи, меню, заказы, удаление и редактирование блюд.",
+      "item": [
+        { "name": "Get Admin Logs", "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/admin/logs", "host": ["{{baseUrl}}"], "path": ["admin", "logs"] } }, "response": [] },
+        { "name": "Get Admin Menu", "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/admin/menu", "host": ["{{baseUrl}}"], "path": ["admin", "menu"] } }, "response": [] },
+        { "name": "Get Admin Orders", "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/admin/orders", "host": ["{{baseUrl}}"], "path": ["admin", "orders"] } }, "response": [] },
+        { "name": "Get Admin Order Items", "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/admin/order_items", "host": ["{{baseUrl}}"], "path": ["admin", "order_items"] } }, "response": [] },
+        { "name": "Delete Menu Item (Admin)", "request": { "method": "POST", "header": [ { "key": "Content-Type", "value": "application/json" } ], "body": { "mode": "raw", "raw": "{\n  \"id\": \"menu_test_1\"\n}" }, "url": { "raw": "{{baseUrl}}/admin/menu/delete", "host": ["{{baseUrl}}"], "path": ["admin", "menu", "delete"] } }, "response": [] },
+        { "name": "Edit Menu Item (Admin)", "request": { "method": "POST", "header": [ { "key": "Content-Type", "value": "application/json" } ], "body": { "mode": "raw", "raw": "{\n  \"id\": \"menu_test_1\", \"name\": \"Борщ обновлён\"\n}" }, "url": { "raw": "{{baseUrl}}/admin/menu/edit", "host": ["{{baseUrl}}"], "path": ["admin", "menu", "edit"] } }, "response": [] }
+      ]
+    },
+    {
+      "name": "Sync",
+      "description": "Синхронизация меню и категорий с iiko, проверка статуса.",
+      "item": [
+        { "name": "Sync Nomenclature", "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/sync/nomenclature", "host": ["{{baseUrl}}"], "path": ["sync", "nomenclature"] } }, "response": [] },
+        { "name": "Sync Categories Status", "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/sync/categories/status", "host": ["{{baseUrl}}"], "path": ["sync", "categories", "status"] } }, "response": [] },
+        { "name": "Sync Menu Status", "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/sync/menu/status", "host": ["{{baseUrl}}"], "path": ["sync", "menu", "status"] } }, "response": [] },
+        { "name": "Sync Check Command", "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/sync/check-command/{{correlationId}}", "host": ["{{baseUrl}}"], "path": ["sync", "check-command", "{{correlationId}}"] } }, "response": [] }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080", "type": "string" },
+    { "key": "android_id", "value": "test_android_id", "type": "string" },
+    { "key": "orderId", "value": "ord_1234567890", "type": "string" },
+    { "key": "menuItemId", "value": "menu_test_1", "type": "string" }
+  ]
+}

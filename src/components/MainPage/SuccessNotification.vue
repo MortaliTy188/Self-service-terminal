@@ -46,6 +46,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import { formatOrderNumber } from '@/utils/orderUtils'
 
 const props = defineProps({
   show: {
@@ -61,9 +62,18 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 
 const orderNumber = computed(() => {
-  if (!props.orderDetails) return '000'
-  const time = new Date().getTime()
-  return String(time).slice(-3)
+  if (!props.orderDetails) return '#0000'
+
+  // Используем displayNumber если есть, иначе форматируем id
+  if (props.orderDetails.displayNumber) {
+    return props.orderDetails.displayNumber
+  }
+
+  if (props.orderDetails.id) {
+    return formatOrderNumber(props.orderDetails.id)
+  }
+
+  return '#0000'
 })
 
 const closeNotification = () => {

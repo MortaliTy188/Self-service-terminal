@@ -19,7 +19,7 @@
           <td colspan="7">Нет заказов для отображения</td>
         </tr>
         <tr v-else v-for="order in orders" :key="order.id" class="table-row">
-          <td>{{ order.id }}</td>
+          <td>{{ formatOrderNumber(order.id) }}</td>
           <td>{{ order.orderTime }}</td>
           <td>{{ order.orderType }}</td>
           <td>{{ order.tableNumber }}</td>
@@ -73,6 +73,7 @@
 
 <script setup>
 import { useApiConfigStore } from '@/stores'
+import { formatOrderNumber } from '@/utils/orderUtils'
 
 const apiConfigStore = useApiConfigStore()
 
@@ -133,7 +134,7 @@ const updateOrderStatus = async (orderId, newStatus) => {
       completed: 'выполнен',
       cancelled: 'отменен',
     }
-    alert(`Заказ #${orderId} отмечен как ${statusTexts[newStatus]}`)
+    alert(`Заказ ${formatOrderNumber(orderId)} отмечен как ${statusTexts[newStatus]}`)
   } catch (error) {
     console.error('Ошибка при обновлении статуса заказа:', error)
     alert(`Ошибка при обновлении статуса: ${error.message}`)

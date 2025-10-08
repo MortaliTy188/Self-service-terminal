@@ -69,11 +69,7 @@
         </div>
 
         <div class="device-actions">
-          <button
-            class="btn-assign"
-            @click="openAssignModal(device)"
-            :disabled="!device.short_id === false"
-          >
+          <button class="btn-assign" @click="openAssignModal(device)">
             {{ device.short_id ? '✏️ Изменить стол' : '📍 Назначить стол' }}
           </button>
           <button class="btn-info" @click="loadDeviceInfo(device.android_id)">🔄 Обновить</button>
@@ -166,7 +162,7 @@
     <div v-if="showAssignModal" class="modal-overlay" @click="closeAssignModal">
       <div class="modal-content" @click.stop>
         <div class="modal-header">
-          <h3>Назначить номер стола</h3>
+          <h3>{{ selectedDevice?.short_id ? 'Изменить номер стола' : 'Назначить номер стола' }}</h3>
           <button class="close-btn" @click="closeAssignModal">✕</button>
         </div>
 
@@ -181,10 +177,14 @@
               v-model="assignShortId"
               type="text"
               class="form-input"
-              placeholder="1"
+              :placeholder="selectedDevice?.short_id ? `Текущий: ${selectedDevice.short_id}` : '1'"
               required
             />
-            <small>Короткий идентификатор стола для планшета</small>
+            <small>{{
+              selectedDevice?.short_id
+                ? 'Введите новый номер стола'
+                : 'Короткий идентификатор стола для планшета'
+            }}</small>
           </div>
 
           <div v-if="assignError" class="error-message">{{ assignError }}</div>
@@ -197,7 +197,15 @@
             @click="confirmAssignShortId"
             :disabled="!assignShortId || isAssigning"
           >
-            {{ isAssigning ? 'Назначение...' : 'Назначить' }}
+            {{
+              isAssigning
+                ? selectedDevice?.short_id
+                  ? 'Изменение...'
+                  : 'Назначение...'
+                : selectedDevice?.short_id
+                  ? 'Изменить'
+                  : 'Назначить'
+            }}
           </button>
         </div>
       </div>
@@ -321,19 +329,31 @@ const confirmAssignShortId = async () => {
       selectedDevice.value.android_id,
     )
 
-    const result = await deviceStore.assignShortId(
-      selectedDevice.value.android_id,
-      assignShortId.value,
-    )
+    let result
+
+    // Если у устройства уже есть short_id, используем updateDeviceTable
+    // Иначе используем assignShortId
+    if (selectedDevice.value.short_id) {
+      console.log('📱 Изменяем номер стола (устройство уже имеет стол)')
+      result = await deviceStore.updateDeviceTable(
+        selectedDevice.value.android_id,
+        assignShortId.value,
+      )
+    } else {
+      console.log('📱 Назначаем номер стола (первое назначение)')
+      result = await deviceStore.assignShortId(selectedDevice.value.android_id, assignShortId.value)
+    }
 
     if (result.success) {
-      console.log('✅ Номер стола назначен, обновляем список...')
+      console.log('✅ Номер стола назначен/изменен, обновляем список...')
 
       // Перезагружаем весь список устройств для актуальности
       await loadDevices()
 
       closeAssignModal()
-      alert(`Номер стола ${assignShortId.value} успешно назначен устройству!`)
+      alert(
+        `Номер стола ${assignShortId.value} успешно ${selectedDevice.value.short_id ? 'изменен' : 'назначен'} устройству!`,
+      )
     } else {
       assignError.value = result.error || 'Ошибка назначения номера стола'
     }
