@@ -15,7 +15,7 @@ export const useApiConfigStore = defineStore('apiConfig', () => {
   const lastUpdated = ref(null)
 
   // Режимы работы
-  const serverMode = ref('local') // 'local' или 'public'
+  const serverMode = ref('public') // 'local' или 'public'
   const useProxy = ref(false) // Флаг для использования прокси (для обхода CORS)
 
   // Constants
