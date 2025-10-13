@@ -10,19 +10,22 @@
             :filters="orderFilters"
             @filter-change="setFilter"
           />
-          <div class="table-search">
-            <input
-              v-model="tableSearchInput"
-              type="number"
-              placeholder="Поиск по столу..."
-              class="table-search-input"
-              @input="handleTableSearch"
-              min="1"
-              max="99"
-            />
-            <button v-if="tableSearchInput" @click="clearTableSearch" class="clear-search-btn">
-              ✕
-            </button>
+          <div class="controls-right">
+            <WebSocketStatus />
+            <div class="table-search">
+              <input
+                v-model="tableSearchInput"
+                type="number"
+                placeholder="Поиск по столу..."
+                class="table-search-input"
+                @input="handleTableSearch"
+                min="1"
+                max="99"
+              />
+              <button v-if="tableSearchInput" @click="clearTableSearch" class="clear-search-btn">
+                ✕
+              </button>
+            </div>
           </div>
         </div>
         <OrdersTable
@@ -83,7 +86,13 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
-import { useOrdersStore, useWaiterStore, useMenuStore, useApiConfigStore } from '@/stores'
+import {
+  useOrdersStore,
+  useWaiterStore,
+  useMenuStore,
+  useApiConfigStore,
+  useWebSocketStore,
+} from '@/stores'
 import {
   LeftSidebar,
   OrderFilters,
@@ -93,12 +102,14 @@ import {
   DeviceManagement,
   SettingsManagement,
 } from '@/components/OrdersPage'
+import WebSocketStatus from '@/components/common/WebSocketStatus.vue'
 
 // Используем Pinia stores
 const ordersStore = useOrdersStore()
 const waiterStore = useWaiterStore()
 const menuStore = useMenuStore()
 const apiConfigStore = useApiConfigStore()
+const webSocketStore = useWebSocketStore()
 
 // Данные из stores
 const orders = computed(() => ordersStore.orders)
@@ -326,8 +337,17 @@ const loadMenuData = async () => {
 
 // Функция обновления страницы
 const refreshPage = async () => {
+  // Обновляем данные вручную (резервный способ)
+  console.log('🔄 Ручное обновление данных')
   await ordersStore.fetchOrders()
   await waiterStore.fetchNotifications()
+
+  // Переподключаем WebSocket если он отключен
+  if (!webSocketStore.isConnected) {
+    console.log('🔌 WebSocket отключен, переподключаемся...')
+    webSocketStore.connect()
+  }
+
   if (activeTab.value === 'menu') {
     await loadMenuData()
   }
@@ -539,6 +559,10 @@ onMounted(async () => {
   // Загружаем API конфигурацию
   await apiConfigStore.fetchConfig()
 
+  // Инициализируем WebSocket соединение для реального времени
+  console.log('🔌 Инициализация WebSocket соединения...')
+  webSocketStore.connect()
+
   // Проверяем, есть ли неразрешенные уведомления при загрузке
   const activeNotifications = notifications.value.filter((n) => !n.resolved)
   if (activeNotifications.length > 0) {
@@ -547,15 +571,18 @@ onMounted(async () => {
     showNewNotification(activeNotifications[0])
   }
 
-  // Проверяем уведомления каждые 30 секунд
-  // В реальном приложении здесь будет WebSocket подключение
+  // Fallback: проверяем уведомления каждые 30 секунд если WebSocket не работает
   const notificationInterval = setInterval(() => {
-    waiterStore.fetchNotifications()
+    if (!webSocketStore.isConnected) {
+      waiterStore.fetchNotifications()
+    }
   }, 30000)
 
-  // Очистка интервала при размонтировании
+  // Очистка ресурсов при размонтировании
   onUnmounted(() => {
     clearInterval(notificationInterval)
+    console.log('🔌 Отключение WebSocket соединения...')
+    webSocketStore.disconnect()
   })
 })
 </script>
@@ -609,9 +636,16 @@ onMounted(async () => {
 .orders-controls {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 20px;
   margin-bottom: 20px;
   flex-wrap: wrap;
+}
+
+.controls-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 
 .table-search {

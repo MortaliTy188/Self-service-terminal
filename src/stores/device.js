@@ -876,6 +876,32 @@ export const useDeviceStore = defineStore('device', () => {
     return !!(window.Android && typeof window.Android.getAndroidId === 'function')
   })
 
+  /**
+   * Обновление номера стола устройства из WebSocket события
+   */
+  const updateDeviceTableFromWebSocket = (android_id, short_id) => {
+    try {
+      // Обновляем в списке устройств
+      const deviceIndex = allDevices.value.findIndex((device) => device.android_id === android_id)
+      if (deviceIndex !== -1) {
+        allDevices.value[deviceIndex] = {
+          ...allDevices.value[deviceIndex],
+          short_id: short_id,
+        }
+        console.log('📱 Номер стола устройства обновлен через WebSocket:', { android_id, short_id })
+      }
+
+      // Если это текущее устройство, обновляем его данные
+      if (android_id === androidId.value) {
+        shortId.value = short_id
+        saveDeviceToStorage()
+        console.log('📱 Номер стола текущего устройства обновлен через WebSocket:', short_id)
+      }
+    } catch (error) {
+      console.error('❌ Ошибка обновления номера стола из WebSocket:', error)
+    }
+  }
+
   return {
     // State - текущее устройство
     deviceInfo,
@@ -922,5 +948,6 @@ export const useDeviceStore = defineStore('device', () => {
     updateDeviceTable,
     registerPendingDevice,
     refreshDeviceInfo,
+    updateDeviceTableFromWebSocket,
   }
 })

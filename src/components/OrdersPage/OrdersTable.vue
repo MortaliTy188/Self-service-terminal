@@ -145,6 +145,7 @@ const updateOrderStatus = async (orderId, newStatus) => {
 <style scoped>
 .container-right-body {
   flex: 1;
+  overflow-y: auto;
   padding-bottom: 40px;
 }
 
@@ -153,7 +154,6 @@ const updateOrderStatus = async (orderId, newStatus) => {
   border-collapse: collapse;
   background: white;
   border-radius: 10px;
-  overflow: hidden;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 

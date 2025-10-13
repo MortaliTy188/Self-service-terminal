@@ -307,6 +307,111 @@
         </div>
       </div>
     </div>
+
+    <!-- Модальное окно результата синхронизации меню -->
+    <div v-if="showSyncMenuModal" class="modal-overlay" @click="closeSyncMenuModal">
+      <div class="modal-content sync-modal" @click.stop>
+        <div class="modal-header">
+          <h3>
+            {{ syncMenuResult?.success ? '✅ Синхронизация меню' : '❌ Ошибка синхронизации' }}
+          </h3>
+          <button class="close-btn" @click="closeSyncMenuModal">✕</button>
+        </div>
+
+        <div class="modal-body">
+          <div
+            class="sync-result"
+            :class="{ success: syncMenuResult?.success, error: !syncMenuResult?.success }"
+          >
+            <div class="sync-icon">
+              {{ syncMenuResult?.success ? '🍽️' : '⚠️' }}
+            </div>
+            <div class="sync-message">
+              <h4>
+                {{ syncMenuResult?.success ? 'Синхронизация завершена!' : 'Произошла ошибка' }}
+              </h4>
+              <p>
+                {{
+                  syncMenuResult?.message ||
+                  (syncMenuResult?.success
+                    ? 'Меню успешно обновлено'
+                    : 'Не удалось синхронизировать меню')
+                }}
+              </p>
+
+              <div v-if="syncMenuResult?.success && syncMenuResult?.items_count" class="sync-stats">
+                <div class="stat-item">
+                  <span class="stat-label">Элементов меню:</span>
+                  <span class="stat-value">{{ syncMenuResult.items_count }}</span>
+                </div>
+                <div v-if="syncMenuResult.categories_count" class="stat-item">
+                  <span class="stat-label">Категорий:</span>
+                  <span class="stat-value">{{ syncMenuResult.categories_count }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn-confirm" @click="closeSyncMenuModal">Понятно</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Модальное окно результата синхронизации столов -->
+    <div v-if="showSyncTablesModal" class="modal-overlay" @click="closeSyncTablesModal">
+      <div class="modal-content sync-modal" @click.stop>
+        <div class="modal-header">
+          <h3>
+            {{ syncTablesResult?.success ? '✅ Синхронизация столов' : '❌ Ошибка синхронизации' }}
+          </h3>
+          <button class="close-btn" @click="closeSyncTablesModal">✕</button>
+        </div>
+
+        <div class="modal-body">
+          <div
+            class="sync-result"
+            :class="{ success: syncTablesResult?.success, error: !syncTablesResult?.success }"
+          >
+            <div class="sync-icon">
+              {{ syncTablesResult?.success ? '🪑' : '⚠️' }}
+            </div>
+            <div class="sync-message">
+              <h4>
+                {{ syncTablesResult?.success ? 'Синхронизация завершена!' : 'Произошла ошибка' }}
+              </h4>
+              <p>
+                {{
+                  syncTablesResult?.message ||
+                  (syncTablesResult?.success
+                    ? 'Столы успешно обновлены'
+                    : 'Не удалось синхронизировать столы')
+                }}
+              </p>
+
+              <div
+                v-if="syncTablesResult?.success && syncTablesResult?.synced_count !== undefined"
+                class="sync-stats"
+              >
+                <div class="stat-item">
+                  <span class="stat-label">Синхронизировано столов:</span>
+                  <span class="stat-value">{{ syncTablesResult.synced_count }}</span>
+                </div>
+                <div v-if="syncTablesResult.total_count" class="stat-item">
+                  <span class="stat-label">Всего столов:</span>
+                  <span class="stat-value">{{ syncTablesResult.total_count }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn-confirm" @click="closeSyncTablesModal">Понятно</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -336,10 +441,14 @@ const {
 const showAccountPopup = ref(false)
 const showApiPopup = ref(false)
 const showSplashPopup = ref(false)
+const showSyncMenuModal = ref(false)
+const showSyncTablesModal = ref(false)
 
 // Состояния синхронизации
 const isSyncingMenu = ref(false)
 const isSyncingTables = ref(false)
+const syncMenuResult = ref(null)
+const syncTablesResult = ref(null)
 
 // Ссылка на input файла
 const fileInput = ref(null)
@@ -576,7 +685,6 @@ const handleImageUpload = (event) => {
 const syncMenu = async () => {
   isSyncingMenu.value = true
   try {
-    console.log('Запуск синхронизации меню с iiko...')
     const response = await fetch(apiConfigStore.getSecureUrl('/sync/nomenclature'), {
       method: 'GET',
       headers: {
@@ -589,16 +697,25 @@ const syncMenu = async () => {
     }
 
     const result = await response.json()
-    console.log('Синхронизация меню завершена:', result)
 
-    if (result.success) {
-      alert(`Синхронизация меню успешно завершена!\n${result.message || 'Меню обновлено'}`)
-    } else {
-      alert(`Ошибка синхронизации: ${result.message || 'Неизвестная ошибка'}`)
+    // Нормализуем результат для единообразного отображения
+    const normalizedResult = {
+      ...result,
+      success: result.synced || result.success || true, // По умолчанию считаем успешным, если нет ошибки
+      items_count: result.items_count || result.count || 0,
+      categories_count: result.categories_count || 0,
     }
+
+    syncMenuResult.value = normalizedResult
+    showSyncMenuModal.value = true
   } catch (error) {
     console.error('Ошибка синхронизации меню:', error)
-    alert(`Ошибка синхронизации меню: ${error.message}`)
+    syncMenuResult.value = {
+      success: false,
+      message: error.message,
+      error: true,
+    }
+    showSyncMenuModal.value = true
   } finally {
     isSyncingMenu.value = false
   }
@@ -622,15 +739,38 @@ const syncTables = async () => {
     const result = await response.json()
     console.log('Синхронизация столов завершена:', result)
 
-    alert(
-      `Синхронизация столов завершена!\n${result.message || 'Столы обновлены'}\nСинхронизировано: ${result.synced_count || 0} столов`,
-    )
+    // Нормализуем результат для единообразного отображения
+    const normalizedResult = {
+      ...result,
+      success: result.synced || result.success || false,
+      synced_count: result.synced_count || result.count || 0,
+      total_count: result.total_count || result.total || 0,
+    }
+
+    syncTablesResult.value = normalizedResult
+    showSyncTablesModal.value = true
   } catch (error) {
     console.error('Ошибка синхронизации столов:', error)
-    alert(`Ошибка синхронизации столов: ${error.message}`)
+    syncTablesResult.value = {
+      success: false,
+      message: error.message,
+      error: true,
+    }
+    showSyncTablesModal.value = true
   } finally {
     isSyncingTables.value = false
   }
+}
+
+// Функции закрытия модальных окон синхронизации
+const closeSyncMenuModal = () => {
+  showSyncMenuModal.value = false
+  syncMenuResult.value = null
+}
+
+const closeSyncTablesModal = () => {
+  showSyncTablesModal.value = false
+  syncTablesResult.value = null
 }
 
 // Инициализация
@@ -1176,6 +1316,191 @@ onMounted(async () => {
 
   .popup-actions {
     flex-direction: column;
+  }
+}
+
+/* Стили для модальных окон синхронизации */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  backdrop-filter: blur(4px);
+}
+
+.modal-content {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  color: #6b7280;
+  transition: all 0.2s ease;
+}
+
+.close-btn:hover {
+  background: #e5e7eb;
+  color: #1f2937;
+}
+
+.modal-body {
+  padding: 24px;
+}
+
+.modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: flex-end;
+  background: #f9fafb;
+}
+
+.sync-modal {
+  max-width: 500px;
+  width: 90%;
+}
+
+.sync-result {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  padding: 20px;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.sync-result.success {
+  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+  border: 2px solid #10b981;
+}
+
+.sync-result.error {
+  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+  border: 2px solid #ef4444;
+}
+
+.sync-icon {
+  font-size: 48px;
+  text-align: center;
+  min-width: 60px;
+}
+
+.sync-message {
+  flex: 1;
+}
+
+.sync-message h4 {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.sync-message p {
+  margin: 0 0 16px 0;
+  color: #6b7280;
+  line-height: 1.5;
+}
+
+.sync-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stat-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.stat-label {
+  font-weight: 500;
+  color: #374151;
+}
+
+.stat-value {
+  font-weight: 600;
+  color: #1f2937;
+  background: #f3f4f6;
+  padding: 4px 8px;
+  border-radius: 4px;
+  min-width: 40px;
+  text-align: center;
+}
+
+.btn-confirm {
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-width: 120px;
+}
+
+.btn-confirm:hover {
+  background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.btn-confirm:active {
+  transform: translateY(0);
+}
+
+@media (max-width: 768px) {
+  .sync-modal {
+    width: 95%;
+    margin: 10px;
+  }
+
+  .sync-result {
+    flex-direction: column;
+    text-align: center;
+    gap: 16px;
+  }
+
+  .sync-icon {
+    min-width: auto;
   }
 }
 </style>
