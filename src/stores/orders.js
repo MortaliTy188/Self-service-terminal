@@ -5,6 +5,7 @@ import { useMenuStore } from './menu'
 import { useApiConfigStore } from './apiConfig'
 import { useDeviceStore } from './device'
 import { useAuthStore } from './auth'
+import { formatOrderNumber } from '@/utils/orderUtils'
 
 export const useOrdersStore = defineStore('orders', () => {
   const mainStore = useMainStore()
@@ -19,17 +20,7 @@ export const useOrdersStore = defineStore('orders', () => {
 
   // Вспомогательная функция для получения table_id устройства
   const getDeviceTableId = () => {
-    console.log('🔍 Проверяем shortId устройства:', deviceStore.shortId)
-    console.log('🔍 Полная информация об устройстве:', {
-      androidId: deviceStore.androidId,
-      shortId: deviceStore.shortId,
-      isRegistered: deviceStore.isRegistered,
-      deviceToken: deviceStore.deviceToken,
-    })
-
-    const tableId = deviceStore.shortId || '22' // fallback на '1' если нет назначенного стола
-    console.log(`📱 Используем table_id устройства: ${tableId}`)
-    return tableId
+    return deviceStore.shortId
   }
 
   // State
@@ -107,7 +98,7 @@ export const useOrdersStore = defineStore('orders', () => {
       }
 
       if (filters.table_number) {
-        queryParams.push(`table_number=${encodeURIComponent(filters.table_number)}`)
+        queryParams.push(`table_id=${encodeURIComponent(filters.table_number)}`)
       }
 
       if (filters.limit) {
@@ -122,8 +113,6 @@ export const useOrdersStore = defineStore('orders', () => {
         url += '?' + queryParams.join('&')
       }
 
-      console.log('📋 Загружаем заказы с сервера:', url)
-
       const headers = {
         'Content-Type': 'application/json',
       }
@@ -131,12 +120,7 @@ export const useOrdersStore = defineStore('orders', () => {
       // Добавляем заголовок сессии администратора, если он есть
       if (authStore.sessionId) {
         headers['X-Admin-Session'] = authStore.sessionId
-        console.log('✅ Добавлен заголовок X-Admin-Session:', authStore.sessionId)
-      } else {
-        console.warn('⚠️ Нет sessionId для авторизации запроса заказов')
       }
-
-      console.log('📤 Заголовки запроса:', headers)
 
       const response = await fetch(url, {
         method: 'GET',
@@ -145,12 +129,10 @@ export const useOrdersStore = defineStore('orders', () => {
 
       if (!response.ok) {
         const errorText = await response.text()
-        console.log('❌ Ошибка загрузки заказов:', errorText)
         throw new Error(`HTTP error! status: ${response.status}`)
       }
 
       const result = await response.json()
-      console.log('✅ Заказы загружены с сервера:', result)
 
       // Нормализуем данные заказов для локального отображения
       // Сервер возвращает { data: [...], summary: {...}, total: number }
@@ -197,41 +179,9 @@ export const useOrdersStore = defineStore('orders', () => {
       console.error('❌ Ошибка загрузки заказов:', err)
       error.value = err.message
 
-      // Fallback на демо данные в случае ошибки
-      orders.value = [
-        {
-          id: 'demo_1',
-          orderTime: '12:30',
-          orderType: 'За столом',
-          tableNumber: 5,
-          items: '2x Бургер, 1x Кола',
-          status: 'ready',
-          totalPrice: 580,
-          createdAt: new Date().toISOString(),
-          cartItems: [
-            { id: 1, name: 'Бургер', price: 250, quantity: 2 },
-            { id: 2, name: 'Кола', price: 80, quantity: 1 },
-          ],
-        },
-        {
-          id: 'demo_2',
-          orderTime: '12:25',
-          orderType: 'С собой',
-          tableNumber: '-',
-          items: '1x Пицца, 2x Сок',
-          status: 'completed',
-          totalPrice: 420,
-          createdAt: new Date(Date.now() - 300000).toISOString(),
-          cartItems: [
-            { id: 3, name: 'Пицца', price: 350, quantity: 1 },
-            { id: 4, name: 'Сок', price: 35, quantity: 2 },
-          ],
-        },
-      ]
-
       mainStore.addNotification({
-        type: 'warning',
-        title: 'Загружены демо данные',
+        type: 'error',
+        title: 'Ошибка загрузки',
         message: 'Не удалось подключиться к серверу',
         duration: 3000,
       })
@@ -248,7 +198,9 @@ export const useOrdersStore = defineStore('orders', () => {
   }
 
   const fetchOrdersByTable = async (tableNumber) => {
-    return await fetchOrders({ table_number: tableNumber })
+    const result = await fetchOrders({ table_number: tableNumber })
+    // Возвращаем массив заказов, а не весь объект ответа
+    return result?.orders || result?.data?.data || []
   }
 
   const fetchOrdersWithPagination = async (limit = 10, offset = 0) => {
@@ -260,19 +212,11 @@ export const useOrdersStore = defineStore('orders', () => {
       // Используем переданный tableId или получаем от устройства
       const actualTableId = tableId || getDeviceTableId()
 
-      console.log(`🛒 Добавляем товар в корзину через API:`)
-      console.log(`   productId: ${productId} (тип: ${typeof productId})`)
-      console.log(`   quantity: ${quantity} (тип: ${typeof quantity})`)
-      console.log(`   tableId: ${actualTableId}`)
-
       const requestBody = {
         menu_item_id: productId,
         qty: quantity,
         table_id: actualTableId,
       }
-
-      console.log('📤 Отправляем на сервер:', requestBody)
-      console.log('📤 JSON строка:', JSON.stringify(requestBody))
 
       const response = await fetch(apiConfigStore.getSecureUrl('/cart/add'), {
         method: 'POST',
@@ -282,22 +226,16 @@ export const useOrdersStore = defineStore('orders', () => {
         body: JSON.stringify(requestBody),
       })
 
-      console.log('📥 Ответ сервера статус:', response.status)
-      console.log('📥 Ответ сервера headers:', Object.fromEntries(response.headers.entries()))
-
       if (!response.ok) {
         const errorText = await response.text()
-        console.log('❌ Тело ошибки от сервера:', errorText)
         throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`)
       }
 
       const result = await response.json()
-      console.log('✅ Товар добавлен в корзину, ответ сервера:', result)
 
       // Убедимся, что меню загружено для правильного обновления корзины
       const menuStore = getMenuStore()
       if (menuStore.menuItems.length === 0) {
-        console.log('⚠️ Меню не загружено, загружаем...')
         await menuStore.fetchMenu()
       }
 
@@ -537,61 +475,84 @@ export const useOrdersStore = defineStore('orders', () => {
       throw new Error('Корзина пуста')
     }
 
-    isLoading.value = true
-    error.value = null
+    // Если устройство зарегистрировано и есть админская сессия, используем device API
+    if (deviceStore.isDeviceReady) {
+      console.log('📱 Создание заказа через Device API')
 
-    try {
-      // ВРЕМЕННО: включаем прокси для обхода CORS
-      if (import.meta.env.DEV && !apiConfigStore.useProxy) {
-        console.log('🔧 Включаем прокси для обхода CORS проблем')
-        apiConfigStore.toggleProxy()
-      }
-
-      // Получаем table_id устройства
-      const deviceTableId = getDeviceTableId()
-
-      // Подготавливаем данные заказа согласно новой документации API
       const orderData = {
-        device_android_id: deviceStore.androidId || "browser_dev_device",
-        table_short_id: deviceTableId,
         items: currentCart.value.map((item) => ({
           menu_item_id: item.id,
           qty: item.quantity,
+          price: item.price,
         })),
         total: cartTotal.value,
       }
 
-      console.log('📝 Создание заказа:', orderData)
-      
-      const url = apiConfigStore.getSecureUrl('/api/orders')
-      console.log('🌐 URL для создания заказа:', url)
-      console.log('🔧 Режим разработки:', import.meta.env.DEV)
-      console.log('🔧 baseUrl:', apiConfigStore.baseUrl)
-      console.log('🔧 useProxy:', apiConfigStore.useProxy)
+      const result = await deviceStore.createDeviceOrder(orderData)
 
-      const headers = {
-        'Content-Type': 'application/json',
-      }
+      if (result.success) {
+        // Создаем локальный объект заказа для отображения
+        const newOrder = {
+          id: result.data.order_id || `ord_${Date.now()}`,
+          orderDate: new Date().toLocaleDateString('ru-RU'),
+          orderTime: new Date().toLocaleTimeString('ru-RU', {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+          orderType: 'За столом',
+          tableNumber: deviceStore.shortId,
+          tableId: deviceStore.shortId,
+          items: [...currentCart.value],
+          itemsText: currentCart.value
+            .map((item) => `${item.quantity}x ${item.name || item.title}`)
+            .join(', '),
+          status: result.data.status || 'pending',
+          totalPrice: cartTotal.value,
+          totalQuantity: cartItemsCount.value,
+          createdAt: new Date().toISOString(),
+          customerName: orderDetails.customerName || '',
+          specialRequests: orderDetails.specialRequests || '',
+          serverData: result.data,
+        }
 
-      // Используем стандартный Authorization Bearer заголовок
-      if (deviceStore.deviceToken) {
-        headers['Authorization'] = `Bearer ${deviceStore.deviceToken}`
-        console.log('🔑 Используем Authorization Bearer для создания заказа')
+        orders.value.unshift(newOrder)
+        lastOrder.value = newOrder
+        clearCart()
+
+        return newOrder
       } else {
-        console.log('⚠️ Нет Device Token - создание заказа может не сработать')
+        throw new Error(result.error || 'Ошибка создания заказа')
+      }
+    }
+
+    // Используем обычный API для браузера
+    isLoading.value = true
+
+    try {
+      // Используем table_id устройства
+      const deviceTableId = getDeviceTableId()
+
+      // Используем API согласно postman_collection "Create Order with Table ID"
+      const requestBody = {
+        order_id: `ord_${Date.now()}`,
+        table_number: orderDetails.tableNumber || parseInt(deviceTableId),
+        table_id: deviceTableId,
       }
 
-      console.log('📤 Заголовки запроса:', headers)
+      console.log('🛒 Создаем заказ через API:', requestBody)
 
-      const response = await fetch(url, {
+      const response = await fetch(apiConfigStore.getSecureUrl('/cart/checkout'), {
         method: 'POST',
-        headers,
-        body: JSON.stringify(orderData),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
       })
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: 'Unknown error' }))
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`)
+        const errorText = await response.text()
+        console.log('❌ Ошибка создания заказа:', errorText)
+        throw new Error(`HTTP error! status: ${response.status}`)
       }
 
       const result = await response.json()
@@ -599,16 +560,17 @@ export const useOrdersStore = defineStore('orders', () => {
 
       // Создаем локальный объект заказа для отображения
       const newOrder = {
-        id: result.order_id || result.id || `ord_${Date.now()}`,
+        id: result.order_id || requestBody.order_id,
+        displayNumber: formatOrderNumber(result.order_id || requestBody.order_id), // Читаемый номер
         orderDate: new Date().toLocaleDateString('ru-RU'),
         orderTime: new Date().toLocaleTimeString('ru-RU', {
           hour: '2-digit',
           minute: '2-digit',
         }),
-        orderType: 'За столом',
-        tableNumber: deviceTableId,
-        tableId: deviceTableId,
-        items: [...currentCart.value],
+        orderType: orderDetails.orderType || 'За столом',
+        tableNumber: orderDetails.tableNumber,
+        tableId: requestBody.table_id, // Добавляем table_id
+        items: [...currentCart.value], // Сохраняем полные объекты товаров
         itemsText: currentCart.value
           .map((item) => `${item.quantity}x ${item.name || item.title}`)
           .join(', '),
@@ -618,17 +580,30 @@ export const useOrdersStore = defineStore('orders', () => {
         createdAt: new Date().toISOString(),
         customerName: orderDetails.customerName || '',
         specialRequests: orderDetails.specialRequests || '',
-        serverData: result,
+        serverData: result, // Сохраняем данные с сервера
       }
 
       orders.value.unshift(newOrder)
       lastOrder.value = newOrder
       clearCart()
 
+      mainStore.addNotification({
+        type: 'success',
+        title: 'Заказ оформлен',
+        message: `Заказ ${formatOrderNumber(newOrder.id)} создан для стола №${requestBody.table_id}`,
+        duration: 3000,
+      })
+
       return newOrder
     } catch (err) {
-      console.error('❌ Ошибка создания заказа:', err)
       error.value = err.message
+      console.error('Error creating order:', err)
+      mainStore.addNotification({
+        type: 'error',
+        title: 'Ошибка создания заказа',
+        message: err.message,
+        duration: 5000,
+      })
       throw err
     } finally {
       isLoading.value = false
@@ -644,7 +619,7 @@ export const useOrdersStore = defineStore('orders', () => {
         mainStore.addNotification({
           type: 'info',
           title: 'Статус заказа изменен',
-          message: `Заказ №${orderId} теперь: ${newStatus}`,
+          message: `Заказ ${formatOrderNumber(orderId)} теперь: ${newStatus}`,
           duration: 3000,
         })
       }
@@ -665,6 +640,116 @@ export const useOrdersStore = defineStore('orders', () => {
 
   const getOrdersByTableNumber = (tableNumber) => {
     return orders.value.filter((order) => order.tableNumber === tableNumber)
+  }
+
+  /**
+   * Добавление заказа из WebSocket события
+   */
+  const addOrderFromWebSocket = (wsOrder) => {
+    try {
+      // Преобразуем формат WebSocket заказа в наш внутренний формат
+      const normalizedOrder = {
+        id: wsOrder.order_id || wsOrder.id,
+        displayNumber: formatOrderNumber(wsOrder.order_id || wsOrder.id),
+        orderDate: new Date(wsOrder.created_at || Date.now()).toLocaleDateString('ru-RU'),
+        orderTime: new Date(wsOrder.created_at || Date.now()).toLocaleTimeString('ru-RU', {
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+        orderType: 'За столом',
+        tableNumber: wsOrder.table_id || wsOrder.table_number || 'N/A',
+        tableId: wsOrder.table_id,
+        items: wsOrder.items || [],
+        itemsText: (wsOrder.items || [])
+          .map((item) => `${item.quantity || 1}x ${item.name || item.title || 'Неизвестно'}`)
+          .join(', '),
+        status: wsOrder.status || 'pending',
+        totalPrice: wsOrder.total || 0,
+        totalQuantity: (wsOrder.items || []).reduce((sum, item) => sum + (item.quantity || 1), 0),
+        createdAt: wsOrder.created_at || new Date().toISOString(),
+        customerName: wsOrder.customer_name || '',
+        specialRequests: wsOrder.special_requests || '',
+        serverData: wsOrder,
+      }
+
+      // Проверяем, нет ли уже такого заказа
+      const existingIndex = orders.value.findIndex((order) => order.id === normalizedOrder.id)
+
+      if (existingIndex === -1) {
+        // Добавляем новый заказ в начало списка
+        orders.value.unshift(normalizedOrder)
+        console.log('📋 Заказ добавлен через WebSocket:', normalizedOrder.displayNumber)
+
+        // Показываем уведомление
+        mainStore.addNotification({
+          type: 'info',
+          title: 'Новый заказ',
+          message: `Заказ ${normalizedOrder.displayNumber} создан для стола №${normalizedOrder.tableNumber}`,
+          duration: 5000,
+        })
+      } else {
+        console.log('📋 Заказ уже существует, пропускаем:', normalizedOrder.displayNumber)
+      }
+    } catch (error) {
+      console.error('❌ Ошибка добавления заказа из WebSocket:', error)
+    }
+  }
+
+  /**
+   * Обновление заказа из WebSocket события
+   */
+  const updateOrderFromWebSocket = (wsOrder) => {
+    try {
+      const orderId = wsOrder.order_id || wsOrder.id
+      const existingIndex = orders.value.findIndex((order) => order.id === orderId)
+
+      if (existingIndex !== -1) {
+        // Обновляем существующий заказ
+        const existingOrder = orders.value[existingIndex]
+        const updatedOrder = {
+          ...existingOrder,
+          status: wsOrder.status || existingOrder.status,
+          totalPrice: wsOrder.total || existingOrder.totalPrice,
+          items: wsOrder.items || existingOrder.items,
+          itemsText: wsOrder.items
+            ? wsOrder.items
+                .map((item) => `${item.quantity || 1}x ${item.name || item.title || 'Неизвестно'}`)
+                .join(', ')
+            : existingOrder.itemsText,
+          totalQuantity: wsOrder.items
+            ? wsOrder.items.reduce((sum, item) => sum + (item.quantity || 1), 0)
+            : existingOrder.totalQuantity,
+          serverData: { ...existingOrder.serverData, ...wsOrder },
+        }
+
+        orders.value[existingIndex] = updatedOrder
+        console.log('📋 Заказ обновлен через WebSocket:', formatOrderNumber(orderId))
+
+        // Показываем уведомление об изменении статуса
+        if (wsOrder.status && wsOrder.status !== existingOrder.status) {
+          const statusTexts = {
+            pending: 'в обработке',
+            preparing: 'готовится',
+            ready: 'готов к выдаче',
+            completed: 'выполнен',
+            cancelled: 'отменен',
+          }
+
+          mainStore.addNotification({
+            type: 'info',
+            title: 'Статус заказа изменен',
+            message: `Заказ ${formatOrderNumber(orderId)} теперь: ${statusTexts[wsOrder.status] || wsOrder.status}`,
+            duration: 3000,
+          })
+        }
+      } else {
+        console.log('📋 Заказ для обновления не найден, добавляем как новый:', orderId)
+        // Если заказ не найден, добавляем его как новый
+        addOrderFromWebSocket(wsOrder)
+      }
+    } catch (error) {
+      console.error('❌ Ошибка обновления заказа из WebSocket:', error)
+    }
   }
 
   return {
@@ -703,5 +788,7 @@ export const useOrdersStore = defineStore('orders', () => {
     getOrderById,
     getOrdersByStatus,
     getOrdersByTableNumber,
+    addOrderFromWebSocket,
+    updateOrderFromWebSocket,
   }
 })

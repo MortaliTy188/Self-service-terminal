@@ -39,7 +39,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 
 const props = defineProps({
   show: Boolean,
@@ -48,6 +48,15 @@ const props = defineProps({
     default: () => ({}),
   },
 })
+
+// Отладочное логирование
+watch(() => props.show, (newValue) => {
+  console.log('🎭 WaiterNotificationPopup show changed:', newValue)
+})
+
+watch(() => props.notification, (newValue) => {
+  console.log('🎭 WaiterNotificationPopup notification changed:', newValue)
+}, { deep: true })
 
 const emit = defineEmits(['close', 'resolve'])
 

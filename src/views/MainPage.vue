@@ -28,6 +28,7 @@ const showOrderDetailsPopup = ref(false)
 const showFoodDetailPopup = ref(false)
 const showSuccessNotification = ref(false)
 const selectedFoodItem = ref(null)
+const tableOrders = ref([]) // Заказы для текущего стола
 
 // Computed values from stores
 const cartItems = computed(() => ordersStore.cartItems)
@@ -56,17 +57,15 @@ const addToCart = (eventData) => {
   // Обработка данных от FoodDetailPopup
   if (eventData.success !== undefined) {
     // Данные уже обработаны в store через addToCartServer
-    console.log('📦 Товар обработан через store:', eventData)
     return
   }
 
-  // Обработка старого формата для обратной совместимости
+  // Обработка данных от других компонентов
   if (eventData.cartData) {
-    console.log('📦 Обновляем корзину данными с сервера:', eventData.cartData)
+    // Обновляем корзину данными с сервера
     ordersStore.updateCartFromServer(eventData.cartData)
   } else {
-    // Fallback для локального добавления
-    console.log('📦 Локальное добавление в корзину:', eventData)
+    // Локальное добавление в корзину
     ordersStore.addToCart(eventData)
   }
 }
@@ -84,14 +83,9 @@ const closeFoodDetailPopup = () => {
 const addQuantity = async (item) => {
   // Используем server API для добавления количества
   try {
-    const result = await ordersStore.addToCartServer(item.id, 1)
-    if (!result.success) {
-      // Fallback на локальное обновление
-      ordersStore.addToCart(item, 1)
-    }
+    await ordersStore.addToCartServer(item.id, 1)
   } catch (error) {
-    // Fallback на локальное обновление
-    ordersStore.addToCart(item, 1)
+    console.error('Ошибка добавления товара:', error)
   }
 }
 
@@ -105,30 +99,17 @@ const removeQuantity = async (index) => {
         const removeResult = await ordersStore.removeFromCartServer(cartItem.id)
         if (removeResult.success) {
           // Затем добавляем с уменьшенным количеством
-          const addResult = await ordersStore.addToCartServer(cartItem.id, cartItem.quantity - 1)
-          if (!addResult.success) {
-            // Если не удалось добавить обратно, пробуем восстановить локально
-            ordersStore.addToCart(cartItem, cartItem.quantity)
-          }
-        } else {
-          // Fallback на локальное обновление
-          ordersStore.updateCartItemQuantity(cartItem.id, cartItem.quantity - 1)
+          await ordersStore.addToCartServer(cartItem.id, cartItem.quantity - 1)
         }
       } catch (error) {
-        // Fallback на локальное обновление
-        ordersStore.updateCartItemQuantity(cartItem.id, cartItem.quantity - 1)
+        console.error('Ошибка изменения количества:', error)
       }
     } else {
       // Если количество равно 1, удаляем товар полностью
       try {
-        const result = await ordersStore.removeFromCartServer(cartItem.id)
-        if (!result.success) {
-          // Fallback на локальное удаление
-          ordersStore.removeFromCart(cartItem.id)
-        }
+        await ordersStore.removeFromCartServer(cartItem.id)
       } catch (error) {
-        // Fallback на локальное удаление
-        ordersStore.removeFromCart(cartItem.id)
+        console.error('Ошибка удаления товара:', error)
       }
     }
   }
@@ -138,24 +119,37 @@ const removeFromCart = async (index) => {
   const cartItem = cartItems.value[index]
   if (cartItem) {
     try {
-      const result = await ordersStore.removeFromCartServer(cartItem.id)
-      if (!result.success) {
-        // Fallback на локальное удаление
-        ordersStore.removeFromCart(cartItem.id)
-      }
+      await ordersStore.removeFromCartServer(cartItem.id)
     } catch (error) {
-      // Fallback на локальное удаление
-      ordersStore.removeFromCart(cartItem.id)
+      console.error('Ошибка удаления товара:', error)
     }
   }
 }
 
 const callWaiter = async () => {
   showWaiterPopup.value = true
+
+  // Получаем номер стола устройства
+  const tableNumber = deviceStore.shortId
+  const message = `Требуется обслуживание стола ${tableNumber}`
+
+  console.log('🔔 Вызываем официанта для стола:', tableNumber)
+
+  // Вызываем официанта через API
+  const result = await waiterStore.callWaiter(tableNumber, message)
+
+  if (!result.success) {
+    console.error('Ошибка при вызове официанта:', result.error)
+  }
+
+  // Закрываем popup через 3 секунды
+  setTimeout(() => {
+    showWaiterPopup.value = false
+  }, 3000)
 }
 
 const handleCallWaiter = async (reason, tableNumber = 5) => {
-  await waiterStore.callWaiter(reason, tableNumber)
+  await waiterStore.callWaiter(tableNumber, reason)
   showWaiterPopup.value = false
 }
 
@@ -163,8 +157,21 @@ const closeWaiterPopup = () => {
   showWaiterPopup.value = false
 }
 
-const showOrderDetails = () => {
-  showOrderDetailsPopup.value = true
+const showOrderDetails = async () => {
+  try {
+    if (deviceStore.shortId) {
+      const orders = await ordersStore.fetchOrdersByTable(deviceStore.shortId)
+      tableOrders.value = Array.isArray(orders) ? orders : []
+    } else {
+      tableOrders.value = []
+    }
+
+    showOrderDetailsPopup.value = true
+  } catch (error) {
+    console.error('Ошибка загрузки заказов стола:', error)
+    tableOrders.value = []
+    showOrderDetailsPopup.value = true
+  }
 }
 
 const closeOrderDetailsPopup = () => {
@@ -186,7 +193,7 @@ const closeOrderPopup = () => {
 const confirmOrder = async (orderData) => {
   const orderDetails = {
     items: [...cartItems.value],
-    tableNumber: orderData?.tableNumber || 5,
+    tableNumber: orderData?.tableNumber,
     customerName: orderData?.customerName || '',
     specialRequests: orderData?.specialRequests || '',
     total: cartItems.value.reduce((sum, item) => sum + item.price * item.quantity, 0),
@@ -251,6 +258,7 @@ onMounted(async () => {
     :show="showOrderDetailsPopup"
     :cart-items="cartItems"
     :last-order="lastOrder"
+    :table-orders="tableOrders"
     @close="closeOrderDetailsPopup"
   />
 

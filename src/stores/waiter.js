@@ -49,41 +49,9 @@ export const useWaiterStore = defineStore('waiter', () => {
 
   const fetchWaiterNotifications = async () => {
     try {
-      // Имитация API запроса
+      // В будущем здесь будет реальный API
       // const response = await fetch('/api/waiter/notifications')
       // const data = await response.json()
-
-      // Добавляем некоторые demo уведомления
-      if (notifications.value.length === 0) {
-        notifications.value = [
-          {
-            id: 1,
-            tableNumber: 5,
-            reason: 'Помощь с заказом',
-            timestamp: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
-            resolved: false,
-            urgent: false,
-          },
-          {
-            id: 2,
-            tableNumber: 3,
-            reason: 'Счёт',
-            timestamp: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
-            resolved: true,
-            urgent: false,
-          },
-          {
-            id: 3,
-            tableNumber: 7,
-            reason: 'Жалоба',
-            timestamp: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
-            resolved: false,
-            urgent: true,
-          },
-        ]
-      }
-
-      // Используем локальные данные
       console.log('Загружаем уведомления официанта...')
     } catch (err) {
       error.value = err.message
@@ -92,39 +60,45 @@ export const useWaiterStore = defineStore('waiter', () => {
     }
   }
 
-  const callWaiter = async (tableNumber) => {
+  const callWaiter = async (tableNumber, message = '') => {
     isLoading.value = true
+    error.value = null
 
     const requestData = {
-      tableNumber: parseInt(tableNumber),
-      timestamp: new Date().toISOString(),
-      type: 'waiter_call',
+      table_id: String(tableNumber),
+      message: message || `Вызов официанта от стола ${tableNumber}`,
     }
 
-    try {
-      // Реальный запрос на сервер (закомментирован)
-      // const response = await fetch('/api/waiter/call', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(requestData)
-      // })
+    console.log('📞 Вызов официанта:', requestData)
+    console.log('🔗 API URL:', `${apiConfigStore.baseUrl}/call-waiter`)
 
-      // Имитируем успешный вызов
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+    try {
+      const response = await fetch(`${apiConfigStore.baseUrl}/call-waiter`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestData),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || `Ошибка ${response.status}: ${response.statusText}`)
+      }
+
+      const result = await response.json()
 
       // Добавляем в историю вызовов
       const callRecord = {
         id: Date.now(),
-        ...requestData,
+        tableNumber: parseInt(tableNumber),
+        message: requestData.message,
+        timestamp: new Date().toISOString(),
+        type: 'waiter_call',
         status: 'sent',
       }
 
       callHistory.value.unshift(callRecord)
-
-      // Имитируем получение нового уведомления через некоторое время
-      setTimeout(() => {
-        simulateNewNotification(tableNumber)
-      }, 2000)
 
       mainStore.addNotification({
         type: 'success',
@@ -133,11 +107,20 @@ export const useWaiterStore = defineStore('waiter', () => {
         duration: 3000,
       })
 
-      return { success: true, message: 'Вызов отправлен' }
-    } catch (error) {
-      console.error('Ошибка при вызове официанта:', error)
-      mainStore.setGlobalError('Не удалось вызвать официанта')
-      return { success: false, error: error.message }
+      console.log('✅ Официант успешно вызван:', result)
+      return { success: true, message: 'Вызов отправлен', data: result }
+    } catch (err) {
+      console.error('❌ Ошибка при вызове официанта:', err)
+      error.value = err.message
+
+      mainStore.addNotification({
+        type: 'error',
+        title: 'Ошибка вызова',
+        message: err.message || 'Не удалось вызвать официанта',
+        duration: 5000,
+      })
+
+      return { success: false, error: err.message }
     } finally {
       isLoading.value = false
     }
@@ -264,6 +247,63 @@ export const useWaiterStore = defineStore('waiter', () => {
     }
   }
 
+  /**
+   * Добавление уведомления из WebSocket
+   */
+  const addNotificationFromWebSocket = (wsData) => {
+    try {
+      const notification = {
+        id: wsData.id || Date.now(),
+        tableNumber: parseInt(wsData.table_id || wsData.tableNumber),
+        message: wsData.message || `Вызов от стола ${wsData.table_id}`,
+        timestamp: wsData.timestamp || new Date().toISOString(),
+        type: wsData.type || 'waiter_call',
+        resolved: false,
+        priority: wsData.priority || 'normal',
+      }
+
+      // Проверяем, нет ли уже такого уведомления
+      const existingIndex = notifications.value.findIndex((n) => n.id === notification.id)
+
+      if (existingIndex === -1) {
+        // Используем unshift для добавления в начало массива
+        // Vue 3 реактивно отслеживает это
+        notifications.value = [notification, ...notifications.value]
+
+        console.log('🔔 Новое уведомление о вызове официанта:', notification)
+        console.log('📋 Всего уведомлений сейчас:', notifications.value.length)
+
+        // Показываем системное уведомление
+        mainStore.addNotification({
+          type: 'warning',
+          title: 'Вызов официанта',
+          message: `Стол ${notification.tableNumber}: ${notification.message}`,
+          duration: 0, // Не закрывать автоматически
+        })
+
+        // Воспроизводим звук (если нужно)
+        playNotificationSound()
+      } else {
+        console.log('📋 Уведомление уже существует, пропускаем')
+      }
+    } catch (error) {
+      console.error('❌ Ошибка добавления уведомления из WebSocket:', error)
+    }
+  }
+
+  /**
+   * Воспроизведение звука уведомления
+   */
+  const playNotificationSound = () => {
+    try {
+      // Можно добавить звуковое уведомление если нужно
+      // const audio = new Audio('/notification.mp3')
+      // audio.play()
+    } catch (error) {
+      console.error('❌ Ошибка воспроизведения звука:', error)
+    }
+  }
+
   return {
     // State
     notifications,
@@ -290,5 +330,7 @@ export const useWaiterStore = defineStore('waiter', () => {
     getNotificationsByTable,
     getCallHistory,
     clearCallHistory,
+    addNotificationFromWebSocket,
+    playNotificationSound,
   }
 })

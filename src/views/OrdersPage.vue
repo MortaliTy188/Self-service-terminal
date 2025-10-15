@@ -258,8 +258,7 @@ const setMenuFilter = (filter) => {
 const handleTableSearch = async () => {
   if (tableSearchInput.value) {
     try {
-      console.log('🔍 Поиск заказов по столу:', tableSearchInput.value)
-      await ordersStore.fetchOrdersByTable(tableSearchInput.value)
+      const result = await ordersStore.fetchOrdersByTable(tableSearchInput.value)
       // Сбрасываем активный фильтр при поиске по столу
       activeFilter.value = 'all'
     } catch (error) {
@@ -428,8 +427,13 @@ const handleSaveItem = async (itemData, isEditMode) => {
 
 // Функции для работы с popup уведомлений
 const showNewNotification = (notification) => {
+  console.log('🔔 showNewNotification вызвана с:', notification)
+  console.log('📋 Текущее состояние showNotificationPopup:', showNotificationPopup.value)
+
   currentNotification.value = notification
   showNotificationPopup.value = true
+
+  console.log('✅ Popup должен быть открыт, showNotificationPopup:', showNotificationPopup.value)
 }
 
 // Функция для обработки создания новой категории
@@ -488,16 +492,25 @@ const resolveNotification = async (notificationId) => {
 watch(
   notifications,
   (newNotifications, oldNotifications) => {
-    if (newNotifications.length > 0 && oldNotifications) {
+    console.log('🔔 Watcher уведомлений сработал:', {
+      новых: newNotifications.length,
+      старых: oldNotifications?.length || 0,
+    })
+
+    if (newNotifications.length > 0) {
       // Находим новые неразрешенные уведомления
-      const pendingNotifications = newNotifications.filter(
-        (n) => !n.resolved && !oldNotifications.some((old) => old.id === n.id),
-      )
+      const pendingNotifications = oldNotifications
+        ? newNotifications.filter(
+            (n) => !n.resolved && !oldNotifications.some((old) => old.id === n.id),
+          )
+        : newNotifications.filter((n) => !n.resolved)
 
       // Показываем popup для первого нового уведомления
       if (pendingNotifications.length > 0) {
-        console.log('Показываем новое уведомление:', pendingNotifications[0])
+        console.log('✅ Показываем новое уведомление:', pendingNotifications[0])
         showNewNotification(pendingNotifications[0])
+      } else {
+        console.log('❌ Нет новых неразрешенных уведомлений для отображения')
       }
     }
   },
@@ -563,6 +576,10 @@ onMounted(async () => {
   console.log('🔌 Инициализация WebSocket соединения...')
   webSocketStore.connect()
 
+  // Подключаемся к WebSocket для уведомлений о вызове официанта
+  console.log('🔌 Инициализация WebSocket официанта...')
+  webSocketStore.connectWaiterSocket()
+
   // Проверяем, есть ли неразрешенные уведомления при загрузке
   const activeNotifications = notifications.value.filter((n) => !n.resolved)
   if (activeNotifications.length > 0) {
@@ -571,18 +588,13 @@ onMounted(async () => {
     showNewNotification(activeNotifications[0])
   }
 
-  // Fallback: проверяем уведомления каждые 30 секунд если WebSocket не работает
-  const notificationInterval = setInterval(() => {
-    if (!webSocketStore.isConnected) {
-      waiterStore.fetchNotifications()
-    }
-  }, 30000)
-
   // Очистка ресурсов при размонтировании
   onUnmounted(() => {
     clearInterval(notificationInterval)
     console.log('🔌 Отключение WebSocket соединения...')
     webSocketStore.disconnect()
+    console.log('🔌 Отключение WebSocket официанта...')
+    webSocketStore.disconnectWaiterSocket()
   })
 })
 </script>

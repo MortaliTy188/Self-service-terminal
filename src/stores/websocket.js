@@ -3,11 +3,12 @@ import { ref, computed } from 'vue'
 import { useApiConfigStore } from './apiConfig'
 import { useOrdersStore } from './orders'
 import { useDeviceStore } from './device'
+import { useWaiterStore } from './waiter'
 
 export const useWebSocketStore = defineStore('websocket', () => {
   const apiConfigStore = useApiConfigStore()
 
-  // State
+  // State для WebSocket заказов
   const socket = ref(null)
   const isConnected = ref(false)
   const isConnecting = ref(false)
@@ -15,6 +16,14 @@ export const useWebSocketStore = defineStore('websocket', () => {
   const reconnectAttempts = ref(0)
   const maxReconnectAttempts = ref(5)
   const reconnectInterval = ref(null)
+
+  // State для WebSocket вызовов официанта
+  const waiterSocket = ref(null)
+  const waiterIsConnected = ref(false)
+  const waiterIsConnecting = ref(false)
+  const waiterConnectionError = ref(null)
+  const waiterReconnectAttempts = ref(0)
+  const waiterReconnectInterval = ref(null)
 
   // Getters
   const connectionStatus = computed(() => {
@@ -166,8 +175,127 @@ export const useWebSocketStore = defineStore('websocket', () => {
     }
   }
 
+  /**
+   * Подключение к WebSocket для уведомлений о вызове официанта
+   */
+  const connectWaiterSocket = () => {
+    if (
+      waiterSocket.value &&
+      (waiterSocket.value.readyState === WebSocket.CONNECTING ||
+        waiterSocket.value.readyState === WebSocket.OPEN)
+    ) {
+      console.log('WebSocket официанта уже подключен или подключается')
+      return
+    }
+
+    waiterIsConnecting.value = true
+    waiterConnectionError.value = null
+
+    try {
+      console.log('🔌 Подключение к WebSocket официанта: ws://83.222.9.90:8080/ws/waiter')
+
+      waiterSocket.value = new WebSocket('ws://83.222.9.90:8080/ws/waiter')
+
+      waiterSocket.value.onopen = () => {
+        console.log('✅ WebSocket официанта подключен')
+        waiterIsConnected.value = true
+        waiterIsConnecting.value = false
+        waiterConnectionError.value = null
+        waiterReconnectAttempts.value = 0
+
+        if (waiterReconnectInterval.value) {
+          clearInterval(waiterReconnectInterval.value)
+          waiterReconnectInterval.value = null
+        }
+      }
+
+      waiterSocket.value.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data)
+          console.log('📨 WebSocket сообщение от официанта:', msg)
+
+          // Получаем waiter store во время выполнения
+          const waiterStore = useWaiterStore()
+
+          if (msg.type === 'waiter_call') {
+            console.log('🔔 Получен вызов официанта:', msg)
+
+            // Добавляем уведомление в store
+            waiterStore.addNotificationFromWebSocket(msg)
+          }
+        } catch (e) {
+          console.error('❌ Ошибка парсинга WebSocket сообщения официанта:', e)
+        }
+      }
+
+      waiterSocket.value.onclose = (event) => {
+        console.log('🔌 WebSocket официанта закрыт:', event.code, event.reason)
+        waiterIsConnected.value = false
+        waiterIsConnecting.value = false
+
+        if (event.code !== 1000) {
+          scheduleWaiterReconnect()
+        }
+      }
+
+      waiterSocket.value.onerror = (error) => {
+        console.error('❌ WebSocket официанта ошибка:', error)
+        waiterConnectionError.value = 'Ошибка подключения к серверу'
+        waiterIsConnecting.value = false
+      }
+    } catch (error) {
+      console.error('❌ Ошибка создания WebSocket официанта:', error)
+      waiterConnectionError.value = error.message
+      waiterIsConnecting.value = false
+    }
+  }
+
+  /**
+   * Отключение WebSocket официанта
+   */
+  const disconnectWaiterSocket = () => {
+    if (waiterReconnectInterval.value) {
+      clearInterval(waiterReconnectInterval.value)
+      waiterReconnectInterval.value = null
+    }
+
+    if (waiterSocket.value) {
+      waiterSocket.value.close(1000, 'Client disconnect')
+      waiterSocket.value = null
+    }
+
+    waiterIsConnected.value = false
+    waiterIsConnecting.value = false
+    waiterConnectionError.value = null
+    waiterReconnectAttempts.value = 0
+  }
+
+  /**
+   * Планирование переподключения WebSocket официанта
+   */
+  const scheduleWaiterReconnect = () => {
+    if (waiterReconnectAttempts.value >= maxReconnectAttempts.value) {
+      console.error(
+        '❌ Превышено максимальное количество попыток переподключения WebSocket официанта',
+      )
+      waiterConnectionError.value = 'Не удалось подключиться к серверу'
+      return
+    }
+
+    waiterReconnectAttempts.value++
+    const delay = Math.min(1000 * Math.pow(2, waiterReconnectAttempts.value), 30000)
+
+    console.log(
+      `🔄 Попытка переподключения WebSocket официанта ${waiterReconnectAttempts.value}/${maxReconnectAttempts.value} через ${delay}ms`,
+    )
+
+    waiterReconnectInterval.value = setTimeout(() => {
+      connectWaiterSocket()
+    }, delay)
+  }
+
   return {
-    // State
+    // State для WebSocket заказов
     isConnected,
     isConnecting,
     connectionError,
@@ -175,10 +303,21 @@ export const useWebSocketStore = defineStore('websocket', () => {
     reconnectAttempts,
     maxReconnectAttempts,
 
+    // State для WebSocket официанта
+    waiterIsConnected,
+    waiterIsConnecting,
+    waiterConnectionError,
+    waiterReconnectAttempts,
+
     // Actions
     connect,
     disconnect,
     sendMessage,
     scheduleReconnect,
+
+    // Actions для WebSocket официанта
+    connectWaiterSocket,
+    disconnectWaiterSocket,
+    scheduleWaiterReconnect,
   }
 })
