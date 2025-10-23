@@ -3,7 +3,7 @@ import defaultSplashImage from '@/assets/mainBackground.png'
 
 // Глобальное состояние настроек заставки
 const splashSettings = ref({
-  currentImage: '',
+  currentImage: '', // Теперь это URL с сервера, а не base64
   duration: 3,
   showOnStartup: true,
 })
@@ -19,6 +19,12 @@ export function useSplashSettings() {
       if (saved) {
         const parsed = JSON.parse(saved)
         splashSettings.value = { ...splashSettings.value, ...parsed }
+      }
+
+      // Также проверяем сохраненное изображение
+      const savedImage = localStorage.getItem('current_splash_image')
+      if (savedImage) {
+        splashSettings.value.currentImage = savedImage
       }
     } catch (error) {
       console.error('Ошибка загрузки настроек заставки:', error)
@@ -36,10 +42,12 @@ export function useSplashSettings() {
     }
   }
 
-  // Обновление изображения заставки
-  const updateSplashImage = (imageData) => {
-    const newSettings = { ...splashSettings.value, currentImage: imageData }
+  // Обновление изображения заставки (теперь принимает URL вместо base64)
+  const updateSplashImage = (imageUrl) => {
+    const newSettings = { ...splashSettings.value, currentImage: imageUrl }
     saveSettings(newSettings)
+    // Также сохраняем отдельно для быстрого доступа
+    localStorage.setItem('current_splash_image', imageUrl)
   }
 
   // Обновление продолжительности показа

@@ -1,11 +1,34 @@
 <script setup>
 import { useRouter } from 'vue-router'
-import { useSettingsStore, useApiConfigStore } from '@/stores'
+import { useSettingsStore, useApiConfigStore, useImagesStore } from '@/stores'
 import { onMounted, computed } from 'vue'
 
 const router = useRouter()
 const settingsStore = useSettingsStore()
 const apiConfigStore = useApiConfigStore()
+const imagesStore = useImagesStore()
+
+// Computed свойство для фона с изображением
+const backgroundStyle = computed(() => {
+  // Получаем URL изображения, убеждаясь что это строка
+  let imageUrl = imagesStore.currentSplashImage
+
+  // Если это объект, извлекаем URL
+  if (imageUrl && typeof imageUrl === 'object') {
+    imageUrl = imageUrl.url || ''
+    console.warn('⚠️ currentSplashImage содержит объект, извлекаем URL:', imageUrl)
+  }
+
+  // Используем изображение с сервера или fallback
+  const finalImageUrl = imageUrl || settingsStore.backgroundImage.value
+
+  return {
+    backgroundImage: `url(${finalImageUrl})`,
+    backgroundRepeat: 'no-repeat',
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+  }
+})
 
 // Computed свойство для проверки состояния конфигурации
 const isConfigured = computed(() => {
@@ -38,11 +61,24 @@ onMounted(async () => {
   console.log('Greetings mounted - загружаем конфигурацию...')
   await apiConfigStore.fetchConfig()
   console.log('Конфигурация загружена:', apiConfigStore.config)
+
+  // Загружаем текущее изображение заставки
+  imagesStore.loadCurrentSplashImage()
+  console.log(
+    'Текущее изображение заставки (тип: %s):',
+    typeof imagesStore.currentSplashImage,
+    imagesStore.currentSplashImage,
+  )
+
+  // Если это объект, выводим предупреждение
+  if (imagesStore.currentSplashImage && typeof imagesStore.currentSplashImage === 'object') {
+    console.warn('⚠️ ВНИМАНИЕ: currentSplashImage - объект, а должна быть строка!')
+  }
 })
 </script>
 
 <template>
-  <main :style="settingsStore.backgroundStyle">
+  <main :style="backgroundStyle">
     <div class="container">
       <h1 class="greetings">Добро пожаловать!</h1>
     </div>

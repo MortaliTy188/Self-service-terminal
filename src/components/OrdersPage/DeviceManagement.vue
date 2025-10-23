@@ -33,8 +33,8 @@
             <h3>{{ device.model || 'Unknown Device' }}</h3>
             <p class="android-id">{{ device.android_id }}</p>
           </div>
-          <div :class="['status-badge', device.status || 'offline']">
-            {{ getStatusText(device.status) }}
+          <div :class="['status-badge', getDeviceStatus(device)]">
+            {{ getStatusText(getDeviceStatus(device)) }}
           </div>
         </div>
 
@@ -64,7 +64,7 @@
           </div>
           <div class="detail-row">
             <span class="label">Последняя активность:</span>
-            <span class="value">{{ formatDate(device.last_activity) }}</span>
+            <span class="value">{{ formatDate(device.last_seen || device.last_activity) }}</span>
           </div>
         </div>
 
@@ -72,7 +72,7 @@
           <button class="btn-assign" @click="openAssignModal(device)">
             {{ device.short_id ? '✏️ Изменить стол' : '📍 Назначить стол' }}
           </button>
-          <button class="btn-info" @click="loadDeviceInfo(device.android_id)">🔄 Обновить</button>
+          <button class="btn-delete" @click="confirmDeleteDevice(device)">🗑️ Удалить</button>
         </div>
       </div>
     </div>
@@ -214,13 +214,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useDeviceStore } from '@/stores/device'
 
 const deviceStore = useDeviceStore()
 
 // State
-const devices = ref([])
 const showRegisterModal = ref(false)
 const showAssignModal = ref(false)
 const isRegistering = ref(false)
@@ -237,6 +236,9 @@ const newDevice = ref({
   app_version: '1.0.0',
 })
 
+// Используем allDevices из store напрямую для реактивности
+const devices = computed(() => deviceStore.allDevices)
+
 // Methods
 const loadDevices = async () => {
   console.log('📱 Загружаем список устройств...')
@@ -245,8 +247,7 @@ const loadDevices = async () => {
     const result = await deviceStore.getAllDevices(true) // Принудительное обновление
 
     if (result.success) {
-      devices.value = result.data
-      console.log('✅ Устройства загружены:', devices.value)
+      console.log('✅ Устройства загружены:', deviceStore.allDevices)
     } else {
       console.error('❌ Ошибка загрузки устройств:', result.error)
       // Показываем уведомление об ошибке
@@ -264,18 +265,49 @@ const loadDeviceInfo = async (android_id) => {
   try {
     const result = await deviceStore.getDeviceInfo(android_id)
     if (result.success) {
-      // Обновляем устройство в списке
-      const index = devices.value.findIndex((d) => d.android_id === android_id)
-      if (index !== -1) {
-        devices.value[index] = { ...devices.value[index], ...result.data.device }
-        console.log('✅ Информация об устройстве обновлена')
-      }
+      // Устройство автоматически обновится в store через updateDeviceInList
+      console.log('✅ Информация об устройстве обновлена')
     } else {
       console.error('❌ Ошибка обновления устройства:', result.error)
       alert(`Ошибка обновления: ${result.error}`)
     }
   } catch (error) {
     console.error('❌ Критическая ошибка обновления:', error)
+    alert(`Критическая ошибка: ${error.message}`)
+  }
+}
+
+const confirmDeleteDevice = (device) => {
+  const deviceName = device.model || device.android_id
+  const tableInfo = device.short_id ? ` (Стол ${device.short_id})` : ''
+
+  if (
+    confirm(
+      `Вы уверены, что хотите удалить устройство "${deviceName}"${tableInfo}?\n\nЭто действие нельзя отменить!`,
+    )
+  ) {
+    deleteDevice(device.android_id)
+  }
+}
+
+const deleteDevice = async (android_id) => {
+  try {
+    console.log('🗑️ Удаляем устройство:', android_id)
+
+    const result = await deviceStore.deleteDevice(android_id)
+
+    if (result.success) {
+      console.log('✅ Устройство удалено')
+      alert('Устройство успешно удалено!')
+
+      // Перезагружаем список устройств
+      await loadDevices()
+    } else {
+      console.error('❌ Ошибка удаления устройства:', result.error)
+      alert(`Ошибка удаления: ${result.error}`)
+    }
+  } catch (error) {
+    console.error('❌ Критическая ошибка удаления:', error)
     alert(`Критическая ошибка: ${error.message}`)
   }
 }
@@ -380,6 +412,15 @@ const closeAssignModal = () => {
   selectedDevice.value = null
   assignShortId.value = ''
   assignError.value = ''
+}
+
+const getDeviceStatus = (device) => {
+  // Если есть явное поле is_active
+  if (device.is_active !== undefined) {
+    return device.is_active ? 'online' : 'offline'
+  }
+  // Fallback на старое поле status
+  return device.status || 'offline'
 }
 
 const getStatusText = (status) => {
@@ -718,7 +759,7 @@ onMounted(() => {
 }
 
 .btn-assign,
-.btn-info {
+.btn-delete {
   flex: 1;
   padding: 10px 16px;
   border: none;
@@ -738,13 +779,13 @@ onMounted(() => {
   background: #2563eb;
 }
 
-.btn-info {
-  background: #f3f4f6;
-  color: #374151;
+.btn-delete {
+  background: #ef4444;
+  color: white;
 }
 
-.btn-info:hover {
-  background: #e5e7eb;
+.btn-delete:hover {
+  background: #dc2626;
 }
 
 /* Модальные окна */

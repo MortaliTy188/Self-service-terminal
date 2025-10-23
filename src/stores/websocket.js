@@ -25,11 +25,26 @@ export const useWebSocketStore = defineStore('websocket', () => {
   const waiterReconnectAttempts = ref(0)
   const waiterReconnectInterval = ref(null)
 
+  // State для WebSocket статуса устройств
+  const deviceStatusSocket = ref(null)
+  const deviceStatusIsConnected = ref(false)
+  const deviceStatusIsConnecting = ref(false)
+  const deviceStatusConnectionError = ref(null)
+  const deviceStatusReconnectAttempts = ref(0)
+  const deviceStatusReconnectInterval = ref(null)
+
   // Getters
   const connectionStatus = computed(() => {
     if (isConnected.value) return 'connected'
     if (isConnecting.value) return 'connecting'
     if (connectionError.value) return 'error'
+    return 'disconnected'
+  })
+
+  const deviceStatusConnectionStatus = computed(() => {
+    if (deviceStatusIsConnected.value) return 'connected'
+    if (deviceStatusIsConnecting.value) return 'connecting'
+    if (deviceStatusConnectionError.value) return 'error'
     return 'disconnected'
   })
 
@@ -82,12 +97,17 @@ export const useWebSocketStore = defineStore('websocket', () => {
           if (msg.type === 'table_changed' && msg.device) {
             console.log('🪑 Изменение стола:', msg.device)
             const deviceStore = useDeviceStore()
+
+            // Обновляем информацию на клиентском устройстве
             if (deviceStore.androidId && msg.device.android_id === deviceStore.androidId) {
               deviceStore.shortId = msg.device.short_id
               deviceStore.deviceInfo = msg.device
               deviceStore.saveDeviceToStorage()
               console.log('✅ Информация об устройстве обновлена')
             }
+
+            // Обновляем список устройств в админ-панели
+            deviceStore.updateDeviceInList(msg.device.android_id, msg.device)
           }
         } catch (e) {
           console.error('❌ Ошибка парсинга WebSocket сообщения:', e)
@@ -294,6 +314,153 @@ export const useWebSocketStore = defineStore('websocket', () => {
     }, delay)
   }
 
+  /**
+   * Подключение к WebSocket статуса устройств
+   */
+  const connectDeviceStatusSocket = () => {
+    if (
+      deviceStatusSocket.value &&
+      (deviceStatusSocket.value.readyState === WebSocket.CONNECTING ||
+        deviceStatusSocket.value.readyState === WebSocket.OPEN)
+    ) {
+      console.log('WebSocket статуса устройств уже подключен или подключается')
+      return
+    }
+
+    deviceStatusIsConnecting.value = true
+    deviceStatusConnectionError.value = null
+
+    try {
+      console.log(
+        '🔌 Подключение к WebSocket статуса устройств: ws://83.222.9.90:8080/ws/deviceStatus',
+      )
+
+      deviceStatusSocket.value = new WebSocket('ws://83.222.9.90:8080/ws/deviceStatus')
+
+      deviceStatusSocket.value.onopen = () => {
+        console.log('✅ WebSocket статуса устройств подключен')
+        deviceStatusIsConnected.value = true
+        deviceStatusIsConnecting.value = false
+        deviceStatusReconnectAttempts.value = 0
+        deviceStatusConnectionError.value = null
+
+        if (deviceStatusReconnectInterval.value) {
+          clearTimeout(deviceStatusReconnectInterval.value)
+          deviceStatusReconnectInterval.value = null
+        }
+      }
+
+      deviceStatusSocket.value.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data)
+
+          if (data.type === 'device_status' && data.device) {
+            const deviceStore = useDeviceStore()
+            const { android_id, is_active, last_seen, battery } = data.device
+
+            // Обновляем устройство в списке всех устройств (для админ-панели)
+            deviceStore.updateDeviceInList(android_id, {
+              is_active,
+              last_seen,
+              battery,
+            })
+
+            // Если это текущее устройство, обновляем его данные
+            if (deviceStore.androidId === android_id) {
+              deviceStore.isActive = is_active
+              deviceStore.battery = battery
+              deviceStore.lastSeen = last_seen
+
+              if (deviceStore.deviceInfo) {
+                deviceStore.deviceInfo = {
+                  ...deviceStore.deviceInfo,
+                  is_active,
+                  last_seen,
+                  battery,
+                }
+                deviceStore.saveDeviceToStorage()
+              }
+            }
+
+            console.log('Обновлен статус устройства:', {
+              android_id,
+              is_active,
+              battery,
+              last_seen,
+            })
+          }
+        } catch (error) {
+          console.error('Ошибка парсинга сообщения WebSocket статуса устройств:', error)
+        }
+      }
+
+      deviceStatusSocket.value.onclose = (event) => {
+        console.log('WebSocket статуса устройств отключен', event.code, event.reason)
+        deviceStatusIsConnected.value = false
+        deviceStatusIsConnecting.value = false
+
+        if (event.code !== 1000) {
+          scheduleDeviceStatusReconnect()
+        }
+      }
+
+      deviceStatusSocket.value.onerror = (error) => {
+        console.error('Ошибка WebSocket статуса устройств:', error)
+        deviceStatusConnectionError.value = 'Ошибка подключения'
+        deviceStatusIsConnecting.value = false
+      }
+    } catch (error) {
+      console.error('Ошибка создания WebSocket статуса устройств:', error)
+      deviceStatusConnectionError.value = error.message
+      deviceStatusIsConnecting.value = false
+      scheduleDeviceStatusReconnect()
+    }
+  }
+
+  /**
+   * Отключение WebSocket статуса устройств
+   */
+  const disconnectDeviceStatusSocket = () => {
+    if (deviceStatusReconnectInterval.value) {
+      clearTimeout(deviceStatusReconnectInterval.value)
+      deviceStatusReconnectInterval.value = null
+    }
+
+    if (deviceStatusSocket.value) {
+      deviceStatusSocket.value.close(1000, 'Закрыто пользователем')
+      deviceStatusSocket.value = null
+    }
+
+    deviceStatusIsConnected.value = false
+    deviceStatusIsConnecting.value = false
+    deviceStatusConnectionError.value = null
+    deviceStatusReconnectAttempts.value = 0
+  }
+
+  /**
+   * Планирование переподключения для WebSocket статуса устройств
+   */
+  const scheduleDeviceStatusReconnect = () => {
+    if (deviceStatusReconnectAttempts.value >= maxReconnectAttempts.value) {
+      console.error(
+        '❌ Превышено максимальное количество попыток переподключения WebSocket статуса устройств',
+      )
+      deviceStatusConnectionError.value = 'Не удалось подключиться к серверу'
+      return
+    }
+
+    deviceStatusReconnectAttempts.value++
+    const delay = Math.min(1000 * Math.pow(2, deviceStatusReconnectAttempts.value), 30000)
+
+    console.log(
+      `🔄 Попытка переподключения WebSocket статуса устройств ${deviceStatusReconnectAttempts.value}/${maxReconnectAttempts.value} через ${delay}ms`,
+    )
+
+    deviceStatusReconnectInterval.value = setTimeout(() => {
+      connectDeviceStatusSocket()
+    }, delay)
+  }
+
   return {
     // State для WebSocket заказов
     isConnected,
@@ -309,6 +476,13 @@ export const useWebSocketStore = defineStore('websocket', () => {
     waiterConnectionError,
     waiterReconnectAttempts,
 
+    // State для WebSocket статуса устройств
+    deviceStatusIsConnected,
+    deviceStatusIsConnecting,
+    deviceStatusConnectionError,
+    deviceStatusReconnectAttempts,
+    deviceStatusConnectionStatus,
+
     // Actions
     connect,
     disconnect,
@@ -319,5 +493,10 @@ export const useWebSocketStore = defineStore('websocket', () => {
     connectWaiterSocket,
     disconnectWaiterSocket,
     scheduleWaiterReconnect,
+
+    // Actions для WebSocket статуса устройств
+    connectDeviceStatusSocket,
+    disconnectDeviceStatusSocket,
+    scheduleDeviceStatusReconnect,
   }
 })

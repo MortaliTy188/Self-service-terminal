@@ -580,6 +580,10 @@ onMounted(async () => {
   console.log('🔌 Инициализация WebSocket официанта...')
   webSocketStore.connectWaiterSocket()
 
+  // Подключаемся к WebSocket для статуса устройств
+  console.log('🔌 Инициализация WebSocket статуса устройств...')
+  webSocketStore.connectDeviceStatusSocket()
+
   // Проверяем, есть ли неразрешенные уведомления при загрузке
   const activeNotifications = notifications.value.filter((n) => !n.resolved)
   if (activeNotifications.length > 0) {
@@ -595,6 +599,8 @@ onMounted(async () => {
     webSocketStore.disconnect()
     console.log('🔌 Отключение WebSocket официанта...')
     webSocketStore.disconnectWaiterSocket()
+    console.log('🔌 Отключение WebSocket статуса устройств...')
+    webSocketStore.disconnectDeviceStatusSocket()
   })
 })
 </script>

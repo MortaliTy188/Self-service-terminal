@@ -283,7 +283,36 @@
           </div>
 
           <div class="form-section">
-            <h3>Загрузить новую заставку</h3>
+            <h3>Загруженные изображения</h3>
+            <div v-if="imagesStore.images.length > 0" class="images-gallery">
+              <div
+                v-for="image in imagesStore.images"
+                :key="image.id"
+                class="gallery-item"
+                :class="{ selected: isImageSelected(image) }"
+                @click="selectImage(image)"
+              >
+                <img :src="apiConfigStore.getSecureUrl(image.url)" :alt="image.filename" />
+                <div class="image-overlay">
+                  <span class="image-name">{{ image.filename }}</span>
+                  <button
+                    class="delete-image-btn"
+                    @click.stop="deleteImage(image.id)"
+                    title="Удалить изображение"
+                  >
+                    🗑️
+                  </button>
+                </div>
+                <div v-if="isImageSelected(image)" class="selected-badge">✓ Выбрано</div>
+              </div>
+            </div>
+            <div v-else class="no-images">
+              <p>📷 Нет загруженных изображений</p>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <h3>Загрузить новое изображение</h3>
             <div class="upload-area" @click="triggerFileUpload">
               <input
                 ref="fileInput"
@@ -418,7 +447,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useSplashSettings } from '@/hooks'
-import { useSettingsStore, useApiConfigStore, useAuthStore } from '@/stores'
+import { useSettingsStore, useApiConfigStore, useAuthStore, useImagesStore } from '@/stores'
 import placeholderImageSrc from '@/assets/mainBackground.png'
 import ServerModeSelector from './ServerModeSelector.vue'
 
@@ -428,6 +457,7 @@ const emit = defineEmits(['save-settings'])
 const settingsStore = useSettingsStore()
 const apiConfigStore = useApiConfigStore()
 const authStore = useAuthStore()
+const imagesStore = useImagesStore()
 
 // Хук для управления настройками заставки
 const {
@@ -506,16 +536,19 @@ const openApiSettings = async () => {
   showApiPopup.value = true
 }
 
-const openSplashSettings = () => {
+const openSplashSettings = async () => {
+  // Загружаем список изображений с сервера
+  await imagesStore.fetchImages()
+
   // Загружаем текущие сохраненные настройки при открытии попапа
   const currentSettings = savedSplashSettings.value || {
-    currentImage: '',
+    currentImage: imagesStore.currentSplashImage || '',
     duration: 3,
     showOnStartup: true,
   }
 
   splashSettings.value = {
-    currentImage: currentSettings.currentImage,
+    currentImage: currentSettings.currentImage || imagesStore.currentSplashImage || '',
     duration: currentSettings.duration,
     showOnStartup: currentSettings.showOnStartup,
   }
@@ -648,11 +681,12 @@ const testApiConnection = async () => {
 const saveSplashSettings = () => {
   console.log('Сохранение настроек заставки:', splashSettings.value)
 
-  // Сохраняем настройки через store
+  // Сохраняем URL изображения вместо base64
   if (splashSettings.value.currentImage) {
-    // Используем новую функцию для base64 строки
-    settingsStore.updateSplashImageBase64(splashSettings.value.currentImage)
+    imagesStore.setCurrentSplashImage(splashSettings.value.currentImage)
   }
+
+  // Сохраняем остальные настройки через hooks
   settingsStore.updateSplashDuration(splashSettings.value.duration)
   settingsStore.updateShowOnStartup(splashSettings.value.showOnStartup)
 
@@ -670,14 +704,104 @@ const triggerFileUpload = () => {
   fileInput.value?.click()
 }
 
-const handleImageUpload = (event) => {
+const handleImageUpload = async (event) => {
   const file = event.target.files[0]
-  if (file) {
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      splashSettings.value.currentImage = e.target.result
+  if (!file) return
+
+  try {
+    console.log('📤 Загружаем изображение:', file.name)
+
+    // Проверяем тип файла
+    if (!file.type.startsWith('image/')) {
+      alert('Пожалуйста, выберите файл изображения')
+      return
     }
-    reader.readAsDataURL(file)
+
+    // Проверяем размер файла (например, макс 5MB)
+    const maxSize = 5 * 1024 * 1024 // 5MB
+    if (file.size > maxSize) {
+      alert('Размер файла слишком большой. Максимальный размер: 5MB')
+      return
+    }
+
+    // Загружаем на сервер
+    const result = await imagesStore.uploadImage(file)
+
+    if (result.success) {
+      console.log('✅ Изображение успешно загружено:', result.data)
+
+      // result.data - это строка URL, например "/uploads/filename.jpg"
+      // Формируем полный URL с базовым адресом
+      const fullImageUrl = apiConfigStore.getSecureUrl(result.data)
+
+      // Устанавливаем как текущее изображение заставки
+      imagesStore.setCurrentSplashImage(fullImageUrl)
+      splashSettings.value.currentImage = fullImageUrl
+
+      // Перезагружаем список изображений
+      await imagesStore.fetchImages()
+
+      alert('Изображение успешно загружено!')
+    } else {
+      console.error('❌ Ошибка загрузки:', result.error)
+      alert(`Ошибка загрузки изображения: ${result.error}`)
+    }
+  } catch (error) {
+    console.error('❌ Ошибка при загрузке изображения:', error)
+    alert(`Ошибка: ${error.message}`)
+  }
+
+  // Очищаем input для возможности повторной загрузки того же файла
+  event.target.value = ''
+}
+
+// Проверка, выбрано ли изображение
+const isImageSelected = (image) => {
+  const fullImageUrl = apiConfigStore.getSecureUrl(image.url)
+  return splashSettings.value.currentImage === fullImageUrl
+}
+
+// Выбор изображения из галереи
+const selectImage = (image) => {
+  const fullImageUrl = apiConfigStore.getSecureUrl(image.url)
+  splashSettings.value.currentImage = fullImageUrl
+  console.log('🖼️ Выбрано изображение:', fullImageUrl)
+}
+
+// Удаление изображения
+const deleteImage = async (imageId) => {
+  if (!confirm('Вы уверены, что хотите удалить это изображение?')) {
+    return
+  }
+
+  try {
+    const result = await imagesStore.deleteImage(imageId)
+
+    if (result.success) {
+      console.log('✅ Изображение удалено:', imageId)
+
+      // Перезагружаем список изображений
+      await imagesStore.fetchImages()
+
+      // Если удалили текущее изображение, сбрасываем выбор
+      const currentImageUrl = splashSettings.value.currentImage
+      const imageStillExists = imagesStore.images.some(
+        (img) => apiConfigStore.getSecureUrl(img.url) === currentImageUrl,
+      )
+
+      if (!imageStillExists) {
+        splashSettings.value.currentImage = ''
+        imagesStore.setCurrentSplashImage('')
+      }
+
+      alert('Изображение успешно удалено!')
+    } else {
+      console.error('❌ Ошибка удаления:', result.error)
+      alert(`Ошибка удаления изображения: ${result.error}`)
+    }
+  } catch (error) {
+    console.error('❌ Ошибка при удалении изображения:', error)
+    alert(`Ошибка: ${error.message}`)
   }
 }
 
@@ -1114,6 +1238,116 @@ onMounted(async () => {
   border-radius: 8px;
   border: 2px solid #e5e7eb;
   object-fit: cover;
+}
+
+.images-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.gallery-item {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 3px solid transparent;
+  transition: all 0.3s ease;
+  aspect-ratio: 4/3;
+  background: #f9fafb;
+}
+
+.gallery-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.gallery-item.selected {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+.gallery-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.image-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.7), transparent);
+  padding: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.gallery-item:hover .image-overlay {
+  opacity: 1;
+}
+
+.image-name {
+  color: white;
+  font-size: 12px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  margin-right: 8px;
+}
+
+.delete-image-btn {
+  background: rgba(239, 68, 68, 0.9);
+  border: none;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: white;
+}
+
+.delete-image-btn:hover {
+  background: rgba(220, 38, 38, 1);
+  transform: scale(1.1);
+}
+
+.selected-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: #3b82f6;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+}
+
+.no-images {
+  text-align: center;
+  padding: 40px 20px;
+  color: #6b7280;
+  background: #f9fafb;
+  border-radius: 8px;
+  border: 2px dashed #d1d5db;
+}
+
+.no-images p {
+  margin: 0;
+  font-size: 16px;
 }
 
 .upload-area {

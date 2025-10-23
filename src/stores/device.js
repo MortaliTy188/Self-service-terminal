@@ -42,6 +42,10 @@ export const useDeviceStore = defineStore('device', () => {
   /**
    * Регистрация устройства на сервере
    * @param {Object} deviceData - Данные устройства
+  /**
+   * Регистрация устройства на сервере
+   * Доступно без авторизации для всех устройств
+   * @param {Object} deviceData - Данные устройства
    * @returns {Object} - Результат регистрации
    */
   const registerDevice = async (deviceData) => {
@@ -58,17 +62,9 @@ export const useDeviceStore = defineStore('device', () => {
 
       console.log('📱 Регистрация устройства:', requestBody)
 
+      // POST /api/devices/register доступен без авторизации
       const headers = {
         'Content-Type': 'application/json',
-      }
-
-      // Добавляем X-Admin-Session если есть админская сессия
-      const authStore = useAuthStore()
-      if (authStore.sessionId) {
-        headers['X-Admin-Session'] = authStore.sessionId
-        console.log('🔑 Используем Admin Session для регистрации устройства')
-      } else {
-        console.log('⚠️ Нет Admin Session для регистрации устройства')
       }
 
       const response = await fetch(apiConfigStore.getSecureUrl('/api/devices/register'), {
@@ -144,7 +140,8 @@ export const useDeviceStore = defineStore('device', () => {
 
   /**
    * Получение информации об устройстве
-   * @param {String} android_id - Android ID устройства
+   * Доступно без авторизации для всех устройств
+   * @param {string} android_id - ID устройства
    * @returns {Object} - Информация об устройстве
    */
   const getDeviceInfo = async (android_id) => {
@@ -154,21 +151,9 @@ export const useDeviceStore = defineStore('device', () => {
     try {
       console.log(`📱 Получение информации об устройстве: ${android_id}`)
 
-      // Подготавливаем заголовки
+      // GET /api/devices/{android_id} доступен без авторизации
       const headers = {
         'Content-Type': 'application/json',
-      }
-
-      // Добавляем заголовок авторизации если есть админская сессия
-      const authStore = useAuthStore()
-      if (authStore.sessionId) {
-        headers['X-Admin-Session'] = authStore.sessionId
-        console.log(
-          '🔑 Используем Admin Session для получения информации об устройстве:',
-          authStore.sessionId,
-        )
-      } else {
-        console.log('⚠️ Нет админской сессии для запроса информации об устройстве')
       }
 
       const response = await fetch(apiConfigStore.getSecureUrl(`/api/devices/${android_id}`), {
@@ -382,6 +367,64 @@ export const useDeviceStore = defineStore('device', () => {
       }
     } catch (err) {
       console.error('❌ Ошибка изменения номера стола:', err)
+      error.value = err.message
+      return {
+        success: false,
+        error: err.message,
+      }
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  /**
+   * Удаление устройства (только для админа)
+   * Требует X-Admin-Session заголовок
+   * @param {String} android_id - Android ID устройства для удаления
+   * @returns {Object} - Результат удаления
+   */
+  const deleteDevice = async (android_id) => {
+    isLoading.value = true
+    error.value = null
+
+    try {
+      console.log('🗑️ Удаление устройства:', android_id)
+
+      // Получаем заголовки авторизации
+      const headers = {}
+
+      // Добавляем X-Admin-Session если авторизованы
+      const authStore = useAuthStore()
+      if (authStore.sessionId) {
+        headers['X-Admin-Session'] = authStore.sessionId
+        console.log('🔑 Используем Admin Session для удаления устройства')
+      } else {
+        throw new Error('Требуется авторизация администратора')
+      }
+
+      const response = await fetch(apiConfigStore.getSecureUrl(`/api/devices/${android_id}`), {
+        method: 'DELETE',
+        headers,
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`)
+      }
+
+      const result = await response.json()
+      console.log('✅ Устройство удалено:', result)
+
+      // Удаляем устройство из локального списка
+      removeDeviceFromList(android_id)
+
+      return {
+        success: true,
+        data: result,
+        message: 'Устройство успешно удалено',
+      }
+    } catch (err) {
+      console.error('❌ Ошибка удаления устройства:', err)
       error.value = err.message
       return {
         success: false,
@@ -690,25 +733,25 @@ export const useDeviceStore = defineStore('device', () => {
         return true
       }
 
-      // Сохраняем данные для регистрации после авторизации админа
-      const pendingDeviceData = {
+      // Устройство не найдено - регистрируем его автоматически
+      console.log('📝 Устройство не найдено - регистрируем автоматически')
+
+      const registrationData = {
         android_id: browserAndroidId,
         model: `${deviceInfo.model} (Browser)`,
         os_version: deviceInfo.os,
         app_version: '1.0.0-browser',
       }
 
-      // Сохраняем в localStorage для последующей регистрации
-      localStorage.setItem('pending_device_registration', JSON.stringify(pendingDeviceData))
+      const registerResult = await registerDevice(registrationData)
 
-      console.log('� Данные устройства сохранены для регистрации после авторизации админа')
-      console.log('ℹ️ Устройство будет автоматически зарегистрировано при входе в админ-панель')
-
-      // Устанавливаем временные данные
-      androidId.value = browserAndroidId
-      deviceInfo.value = pendingDeviceData
-
-      return true
+      if (registerResult.success) {
+        console.log('✅ Браузерное устройство успешно зарегистрировано')
+        return true
+      } else {
+        console.error('❌ Не удалось зарегистрировать браузерное устройство:', registerResult.error)
+        return false
+      }
     } catch (err) {
       console.error('❌ Ошибка подготовки к регистрации:', err)
     }
@@ -946,6 +989,7 @@ export const useDeviceStore = defineStore('device', () => {
     removeDeviceFromList,
     assignShortId,
     updateDeviceTable,
+    deleteDevice,
     registerPendingDevice,
     refreshDeviceInfo,
     updateDeviceTableFromWebSocket,

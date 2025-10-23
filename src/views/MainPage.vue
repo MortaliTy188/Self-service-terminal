@@ -1,7 +1,13 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import AppHeader from '@/components/AppHeader.vue'
-import { useWaiterStore, useOrdersStore, useMenuStore, useDeviceStore } from '@/stores'
+import {
+  useWaiterStore,
+  useOrdersStore,
+  useMenuStore,
+  useDeviceStore,
+  useWebSocketStore,
+} from '@/stores'
 import {
   CategoryList,
   FoodGrid,
@@ -19,6 +25,7 @@ const waiterStore = useWaiterStore()
 const ordersStore = useOrdersStore()
 const menuStore = useMenuStore()
 const deviceStore = useDeviceStore()
+const webSocketStore = useWebSocketStore()
 
 // Local state
 const selectedCategory = ref(null) // null означает "Все категории"
@@ -209,6 +216,16 @@ onMounted(async () => {
   await menuStore.fetchMenuWithCategories()
   // Загружаем корзину с сервера
   await ordersStore.fetchCart()
+
+  // Подключаем WebSocket для получения обновлений в реальном времени
+  console.log('🔌 Подключение WebSocket на главной странице...')
+  webSocketStore.connect()
+})
+
+// Очистка при размонтировании
+onUnmounted(() => {
+  console.log('🔌 Отключение WebSocket на главной странице...')
+  webSocketStore.disconnect()
 })
 </script>
 
