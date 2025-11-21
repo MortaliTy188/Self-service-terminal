@@ -4,6 +4,8 @@ import { useApiConfigStore } from './apiConfig'
 import { useOrdersStore } from './orders'
 import { useDeviceStore } from './device'
 import { useWaiterStore } from './waiter'
+import { useMenuStore } from './menu'
+import { useImagesStore } from './images'
 
 export const useWebSocketStore = defineStore('websocket', () => {
   const apiConfigStore = useApiConfigStore()
@@ -17,13 +19,37 @@ export const useWebSocketStore = defineStore('websocket', () => {
   const maxReconnectAttempts = ref(5)
   const reconnectInterval = ref(null)
 
-  // State для WebSocket вызовов официанта
-  const waiterSocket = ref(null)
-  const waiterIsConnected = ref(false)
-  const waiterIsConnecting = ref(false)
-  const waiterConnectionError = ref(null)
-  const waiterReconnectAttempts = ref(0)
-  const waiterReconnectInterval = ref(null)
+  // State для WebSocket уведомлений (notifications)
+  const notificationsSocket = ref(null)
+  const notificationsIsConnected = ref(false)
+  const notificationsIsConnecting = ref(false)
+  const notificationsConnectionError = ref(null)
+  const notificationsReconnectAttempts = ref(0)
+  const notificationsReconnectInterval = ref(null)
+
+  // State для WebSocket всех уведомлений (notifications/all)
+  const allNotificationsSocket = ref(null)
+  const allNotificationsIsConnected = ref(false)
+  const allNotificationsIsConnecting = ref(false)
+  const allNotificationsConnectionError = ref(null)
+  const allNotificationsReconnectAttempts = ref(0)
+  const allNotificationsReconnectInterval = ref(null)
+
+  // State для WebSocket изображений (images)
+  const imagesSocket = ref(null)
+  const imagesIsConnected = ref(false)
+  const imagesIsConnecting = ref(false)
+  const imagesConnectionError = ref(null)
+  const imagesReconnectAttempts = ref(0)
+  const imagesReconnectInterval = ref(null)
+
+  // State для WebSocket меню (menu)
+  const menuSocket = ref(null)
+  const menuIsConnected = ref(false)
+  const menuIsConnecting = ref(false)
+  const menuConnectionError = ref(null)
+  const menuReconnectAttempts = ref(0)
+  const menuReconnectInterval = ref(null)
 
   // State для WebSocket статуса устройств
   const deviceStatusSocket = ref(null)
@@ -86,17 +112,41 @@ export const useWebSocketStore = defineStore('websocket', () => {
       socket.value.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data)
-          console.log('📨 WebSocket сообщение:', msg)
+          console.log('📨 WebSocket /ws/orders сообщение получено:', msg)
+          console.log('📨 Тип события:', msg.type)
+          console.log('📨 Данные заказа:', msg.order)
 
+          const ordersStore = useOrdersStore()
+          const deviceStore = useDeviceStore()
+
+          // Обработка событий заказов - перезагружаем все заказы для получения полной структуры
           if (msg.type === 'order_created') {
-            console.log('📋 Получен новый заказ, обновляем список заказов')
-            const ordersStore = useOrdersStore()
+            console.log('✅ Обрабатываем order_created - перезагружаем все заказы')
+            // Перезагружаем все заказы с сервера для получения полной структуры
+            ordersStore.fetchOrders()
+          } else if (msg.type === 'order_updated') {
+            console.log('✅ Обрабатываем order_updated - перезагружаем все заказы')
+            // Перезагружаем все заказы с сервера
+            ordersStore.fetchOrders()
+          } else if (msg.type === 'order_status_changed') {
+            console.log('✅ Обрабатываем order_status_changed - перезагружаем все заказы')
+            // Перезагружаем все заказы с сервера
             ordersStore.fetchOrders()
           }
 
+          // Обработка событий корзины (для планшетов)
+          if (msg.type === 'cart_updated') {
+            console.log('🛒 Корзина обновлена для стола:', msg.table_id)
+            // TODO: Обновить корзину если это текущий стол
+            if (deviceStore.shortId === msg.table_id) {
+              // Обновляем локальную корзину
+              console.log('🛒 Обновление корзины текущего устройства')
+            }
+          }
+
+          // Обработка изменения стола устройства
           if (msg.type === 'table_changed' && msg.device) {
             console.log('🪑 Изменение стола:', msg.device)
-            const deviceStore = useDeviceStore()
 
             // Обновляем информацию на клиентском устройстве
             if (deviceStore.androidId && msg.device.android_id === deviceStore.androidId) {
@@ -127,8 +177,20 @@ export const useWebSocketStore = defineStore('websocket', () => {
       }
 
       socket.value.onerror = (error) => {
-        console.error('❌ WebSocket ошибка:', error)
-        connectionError.value = 'Ошибка подключения к серверу'
+        console.error('❌ WebSocket /ws/orders ошибка:', error)
+        console.error('❌ Детали ошибки:', {
+          type: error.type,
+          target: error.target,
+          readyState: error.target?.readyState,
+          url: error.target?.url,
+        })
+        console.error('❌ Сервер не доступен по адресу: ws://83.222.9.90:8080/ws/orders')
+        console.error('❌ Проверьте:')
+        console.error('   1. Запущен ли WebSocket сервер на бэкенде')
+        console.error('   2. Правильный ли путь эндпоинта')
+        console.error('   3. Нет ли блокировки firewall/CORS')
+
+        connectionError.value = 'WebSocket сервер недоступен'
         isConnecting.value = false
       }
     } catch (error) {
@@ -196,121 +258,245 @@ export const useWebSocketStore = defineStore('websocket', () => {
   }
 
   /**
-   * Подключение к WebSocket для уведомлений о вызове официанта
+   * Подключение к WebSocket для уведомлений (вызов официанта, оплата, проблемы)
+   * Используется в админ-панели для получения новых уведомлений
    */
-  const connectWaiterSocket = () => {
+  const connectNotificationsSocket = () => {
     if (
-      waiterSocket.value &&
-      (waiterSocket.value.readyState === WebSocket.CONNECTING ||
-        waiterSocket.value.readyState === WebSocket.OPEN)
+      notificationsSocket.value &&
+      (notificationsSocket.value.readyState === WebSocket.CONNECTING ||
+        notificationsSocket.value.readyState === WebSocket.OPEN)
     ) {
-      console.log('WebSocket официанта уже подключен или подключается')
+      console.log('WebSocket уведомлений уже подключен или подключается')
       return
     }
 
-    waiterIsConnecting.value = true
-    waiterConnectionError.value = null
+    notificationsIsConnecting.value = true
+    notificationsConnectionError.value = null
 
     try {
-      console.log('🔌 Подключение к WebSocket официанта: ws://83.222.9.90:8080/ws/waiter')
+      console.log('🔌 Подключение к WebSocket уведомлений: ws://83.222.9.90:8080/ws/notifications')
 
-      waiterSocket.value = new WebSocket('ws://83.222.9.90:8080/ws/waiter')
+      notificationsSocket.value = new WebSocket('ws://83.222.9.90:8080/ws/notifications')
 
-      waiterSocket.value.onopen = () => {
-        console.log('✅ WebSocket официанта подключен')
-        waiterIsConnected.value = true
-        waiterIsConnecting.value = false
-        waiterConnectionError.value = null
-        waiterReconnectAttempts.value = 0
+      notificationsSocket.value.onopen = () => {
+        console.log('✅ WebSocket уведомлений подключен')
+        notificationsIsConnected.value = true
+        notificationsIsConnecting.value = false
+        notificationsConnectionError.value = null
+        notificationsReconnectAttempts.value = 0
 
-        if (waiterReconnectInterval.value) {
-          clearInterval(waiterReconnectInterval.value)
-          waiterReconnectInterval.value = null
+        if (notificationsReconnectInterval.value) {
+          clearInterval(notificationsReconnectInterval.value)
+          notificationsReconnectInterval.value = null
         }
       }
 
-      waiterSocket.value.onmessage = (event) => {
+      notificationsSocket.value.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data)
-          console.log('📨 WebSocket сообщение от официанта:', msg)
+          console.log('📨 WebSocket уведомление:', msg)
 
-          // Получаем waiter store во время выполнения
           const waiterStore = useWaiterStore()
 
-          if (msg.type === 'waiter_call') {
-            console.log('🔔 Получен вызов официанта:', msg)
+          if (msg.type === 'notification_new' && msg.notification) {
+            console.log('🔔 Получено новое уведомление:', msg.notification)
 
             // Добавляем уведомление в store
-            waiterStore.addNotificationFromWebSocket(msg)
+            waiterStore.addNotificationFromWebSocket({
+              ...msg.notification,
+              type: msg.notification.type, // call_waiter, payment_request, problem
+            })
           }
         } catch (e) {
-          console.error('❌ Ошибка парсинга WebSocket сообщения официанта:', e)
+          console.error('❌ Ошибка парсинга WebSocket сообщения уведомлений:', e)
         }
       }
 
-      waiterSocket.value.onclose = (event) => {
-        console.log('🔌 WebSocket официанта закрыт:', event.code, event.reason)
-        waiterIsConnected.value = false
-        waiterIsConnecting.value = false
+      notificationsSocket.value.onclose = (event) => {
+        console.log('🔌 WebSocket уведомлений закрыт:', event.code, event.reason)
+        notificationsIsConnected.value = false
+        notificationsIsConnecting.value = false
 
         if (event.code !== 1000) {
-          scheduleWaiterReconnect()
+          scheduleNotificationsReconnect()
         }
       }
 
-      waiterSocket.value.onerror = (error) => {
-        console.error('❌ WebSocket официанта ошибка:', error)
-        waiterConnectionError.value = 'Ошибка подключения к серверу'
-        waiterIsConnecting.value = false
+      notificationsSocket.value.onerror = (error) => {
+        console.error('❌ WebSocket уведомлений ошибка:', error)
+        notificationsConnectionError.value = 'Ошибка подключения к серверу'
+        notificationsIsConnecting.value = false
       }
     } catch (error) {
-      console.error('❌ Ошибка создания WebSocket официанта:', error)
-      waiterConnectionError.value = error.message
-      waiterIsConnecting.value = false
+      console.error('❌ Ошибка создания WebSocket уведомлений:', error)
+      notificationsConnectionError.value = error.message
+      notificationsIsConnecting.value = false
     }
   }
 
   /**
-   * Отключение WebSocket официанта
+   * Отключение WebSocket уведомлений
    */
-  const disconnectWaiterSocket = () => {
-    if (waiterReconnectInterval.value) {
-      clearInterval(waiterReconnectInterval.value)
-      waiterReconnectInterval.value = null
+  const disconnectNotificationsSocket = () => {
+    if (notificationsReconnectInterval.value) {
+      clearInterval(notificationsReconnectInterval.value)
+      notificationsReconnectInterval.value = null
     }
 
-    if (waiterSocket.value) {
-      waiterSocket.value.close(1000, 'Client disconnect')
-      waiterSocket.value = null
+    if (notificationsSocket.value) {
+      notificationsSocket.value.close(1000, 'Client disconnect')
+      notificationsSocket.value = null
     }
 
-    waiterIsConnected.value = false
-    waiterIsConnecting.value = false
-    waiterConnectionError.value = null
-    waiterReconnectAttempts.value = 0
+    notificationsIsConnected.value = false
+    notificationsIsConnecting.value = false
+    notificationsConnectionError.value = null
+    notificationsReconnectAttempts.value = 0
   }
 
   /**
-   * Планирование переподключения WebSocket официанта
+   * Планирование переподключения WebSocket уведомлений
    */
-  const scheduleWaiterReconnect = () => {
-    if (waiterReconnectAttempts.value >= maxReconnectAttempts.value) {
+  const scheduleNotificationsReconnect = () => {
+    if (notificationsReconnectAttempts.value >= maxReconnectAttempts.value) {
       console.error(
-        '❌ Превышено максимальное количество попыток переподключения WebSocket официанта',
+        '❌ Превышено максимальное количество попыток переподключения WebSocket уведомлений',
       )
-      waiterConnectionError.value = 'Не удалось подключиться к серверу'
+      notificationsConnectionError.value = 'Не удалось подключиться к серверу'
       return
     }
 
-    waiterReconnectAttempts.value++
-    const delay = Math.min(1000 * Math.pow(2, waiterReconnectAttempts.value), 30000)
+    notificationsReconnectAttempts.value++
+    const delay = Math.min(1000 * Math.pow(2, notificationsReconnectAttempts.value), 30000)
 
     console.log(
-      `🔄 Попытка переподключения WebSocket официанта ${waiterReconnectAttempts.value}/${maxReconnectAttempts.value} через ${delay}ms`,
+      `🔄 Попытка переподключения WebSocket уведомлений ${notificationsReconnectAttempts.value}/${maxReconnectAttempts.value} через ${delay}ms`,
     )
 
-    waiterReconnectInterval.value = setTimeout(() => {
-      connectWaiterSocket()
+    notificationsReconnectInterval.value = setTimeout(() => {
+      connectNotificationsSocket()
+    }, delay)
+  }
+
+  /**
+   * Подключение к WebSocket для получения полного списка уведомлений
+   * Используется для отображения вкладки со всеми уведомлениями
+   */
+  const connectAllNotificationsSocket = () => {
+    if (
+      allNotificationsSocket.value &&
+      (allNotificationsSocket.value.readyState === WebSocket.CONNECTING ||
+        allNotificationsSocket.value.readyState === WebSocket.OPEN)
+    ) {
+      console.log('WebSocket всех уведомлений уже подключен или подключается')
+      return
+    }
+
+    allNotificationsIsConnecting.value = true
+    allNotificationsConnectionError.value = null
+
+    try {
+      console.log(
+        '🔌 Подключение к WebSocket всех уведомлений: ws://83.222.9.90:8080/ws/notifications/all',
+      )
+
+      allNotificationsSocket.value = new WebSocket('ws://83.222.9.90:8080/ws/notifications/all')
+
+      allNotificationsSocket.value.onopen = () => {
+        console.log('✅ WebSocket всех уведомлений подключен')
+        allNotificationsIsConnected.value = true
+        allNotificationsIsConnecting.value = false
+        allNotificationsConnectionError.value = null
+        allNotificationsReconnectAttempts.value = 0
+
+        if (allNotificationsReconnectInterval.value) {
+          clearInterval(allNotificationsReconnectInterval.value)
+          allNotificationsReconnectInterval.value = null
+        }
+      }
+
+      allNotificationsSocket.value.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data)
+          console.log('📨 WebSocket список уведомлений:', msg)
+
+          const waiterStore = useWaiterStore()
+
+          if (msg.type === 'notifications_list' && Array.isArray(msg.notifications)) {
+            console.log('📋 Получен полный список уведомлений:', msg.notifications.length)
+
+            // Обновляем список всех уведомлений в store
+            waiterStore.setAllNotifications(msg.notifications)
+          }
+        } catch (e) {
+          console.error('❌ Ошибка парсинга WebSocket списка уведомлений:', e)
+        }
+      }
+
+      allNotificationsSocket.value.onclose = (event) => {
+        console.log('🔌 WebSocket всех уведомлений закрыт:', event.code, event.reason)
+        allNotificationsIsConnected.value = false
+        allNotificationsIsConnecting.value = false
+
+        if (event.code !== 1000) {
+          scheduleAllNotificationsReconnect()
+        }
+      }
+
+      allNotificationsSocket.value.onerror = (error) => {
+        console.error('❌ WebSocket всех уведомлений ошибка:', error)
+        allNotificationsConnectionError.value = 'Ошибка подключения к серверу'
+        allNotificationsIsConnecting.value = false
+      }
+    } catch (error) {
+      console.error('❌ Ошибка создания WebSocket всех уведомлений:', error)
+      allNotificationsConnectionError.value = error.message
+      allNotificationsIsConnecting.value = false
+    }
+  }
+
+  /**
+   * Отключение WebSocket всех уведомлений
+   */
+  const disconnectAllNotificationsSocket = () => {
+    if (allNotificationsReconnectInterval.value) {
+      clearInterval(allNotificationsReconnectInterval.value)
+      allNotificationsReconnectInterval.value = null
+    }
+
+    if (allNotificationsSocket.value) {
+      allNotificationsSocket.value.close(1000, 'Client disconnect')
+      allNotificationsSocket.value = null
+    }
+
+    allNotificationsIsConnected.value = false
+    allNotificationsIsConnecting.value = false
+    allNotificationsConnectionError.value = null
+    allNotificationsReconnectAttempts.value = 0
+  }
+
+  /**
+   * Планирование переподключения WebSocket всех уведомлений
+   */
+  const scheduleAllNotificationsReconnect = () => {
+    if (allNotificationsReconnectAttempts.value >= maxReconnectAttempts.value) {
+      console.error(
+        '❌ Превышено максимальное количество попыток переподключения WebSocket всех уведомлений',
+      )
+      allNotificationsConnectionError.value = 'Не удалось подключиться к серверу'
+      return
+    }
+
+    allNotificationsReconnectAttempts.value++
+    const delay = Math.min(1000 * Math.pow(2, allNotificationsReconnectAttempts.value), 30000)
+
+    console.log(
+      `🔄 Попытка переподключения WebSocket всех уведомлений ${allNotificationsReconnectAttempts.value}/${maxReconnectAttempts.value} через ${delay}ms`,
+    )
+
+    allNotificationsReconnectInterval.value = setTimeout(() => {
+      connectAllNotificationsSocket()
     }, delay)
   }
 
@@ -461,6 +647,226 @@ export const useWebSocketStore = defineStore('websocket', () => {
     }, delay)
   }
 
+  /**
+   * Подключение к WebSocket изображений
+   */
+  const connectImagesSocket = () => {
+    if (
+      imagesSocket.value &&
+      (imagesSocket.value.readyState === WebSocket.CONNECTING ||
+        imagesSocket.value.readyState === WebSocket.OPEN)
+    ) {
+      console.log('WebSocket изображений уже подключен или подключается')
+      return
+    }
+
+    imagesIsConnecting.value = true
+    imagesConnectionError.value = null
+
+    try {
+      console.log('🔌 Подключение к WebSocket изображений: ws://83.222.9.90:8080/ws/images')
+
+      imagesSocket.value = new WebSocket('ws://83.222.9.90:8080/ws/images')
+
+      imagesSocket.value.onopen = () => {
+        console.log('✅ WebSocket изображений подключен')
+        imagesIsConnected.value = true
+        imagesIsConnecting.value = false
+        imagesConnectionError.value = null
+        imagesReconnectAttempts.value = 0
+
+        if (imagesReconnectInterval.value) {
+          clearTimeout(imagesReconnectInterval.value)
+          imagesReconnectInterval.value = null
+        }
+      }
+
+      imagesSocket.value.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data)
+          console.log('📨 WebSocket изображение обновлено:', msg)
+
+          if (msg.type === 'image_updated' && msg.image) {
+            console.log('🖼️ Обновлена стартовая картинка:', msg.image)
+
+            // Используем новый метод для обработки WebSocket события
+            const imagesStore = useImagesStore()
+            imagesStore.updateImageFromWebSocket(msg.image)
+          }
+        } catch (e) {
+          console.error('❌ Ошибка парсинга WebSocket сообщения изображений:', e)
+        }
+      }
+
+      imagesSocket.value.onclose = (event) => {
+        console.log('🔌 WebSocket изображений закрыт:', event.code, event.reason)
+        imagesIsConnected.value = false
+        imagesIsConnecting.value = false
+
+        if (event.code !== 1000) {
+          scheduleImagesReconnect()
+        }
+      }
+
+      imagesSocket.value.onerror = (error) => {
+        console.error('❌ WebSocket изображений ошибка:', error)
+        imagesConnectionError.value = 'Ошибка подключения к серверу'
+        imagesIsConnecting.value = false
+      }
+    } catch (error) {
+      console.error('❌ Ошибка создания WebSocket изображений:', error)
+      imagesConnectionError.value = error.message
+      imagesIsConnecting.value = false
+    }
+  }
+
+  const disconnectImagesSocket = () => {
+    if (imagesReconnectInterval.value) {
+      clearTimeout(imagesReconnectInterval.value)
+      imagesReconnectInterval.value = null
+    }
+
+    if (imagesSocket.value) {
+      imagesSocket.value.close(1000, 'Client disconnect')
+      imagesSocket.value = null
+    }
+
+    imagesIsConnected.value = false
+    imagesIsConnecting.value = false
+    imagesConnectionError.value = null
+    imagesReconnectAttempts.value = 0
+  }
+
+  const scheduleImagesReconnect = () => {
+    if (imagesReconnectAttempts.value >= maxReconnectAttempts.value) {
+      console.error(
+        '❌ Превышено максимальное количество попыток переподключения WebSocket изображений',
+      )
+      imagesConnectionError.value = 'Не удалось подключиться к серверу'
+      return
+    }
+
+    imagesReconnectAttempts.value++
+    const delay = Math.min(1000 * Math.pow(2, imagesReconnectAttempts.value), 30000)
+
+    console.log(
+      `🔄 Попытка переподключения WebSocket изображений ${imagesReconnectAttempts.value}/${maxReconnectAttempts.value} через ${delay}ms`,
+    )
+
+    imagesReconnectInterval.value = setTimeout(() => {
+      connectImagesSocket()
+    }, delay)
+  }
+
+  /**
+   * Подключение к WebSocket меню
+   */
+  const connectMenuSocket = () => {
+    if (
+      menuSocket.value &&
+      (menuSocket.value.readyState === WebSocket.CONNECTING ||
+        menuSocket.value.readyState === WebSocket.OPEN)
+    ) {
+      console.log('WebSocket меню уже подключен или подключается')
+      return
+    }
+
+    menuIsConnecting.value = true
+    menuConnectionError.value = null
+
+    try {
+      console.log('🔌 Подключение к WebSocket меню: ws://83.222.9.90:8080/ws/menu')
+
+      menuSocket.value = new WebSocket('ws://83.222.9.90:8080/ws/menu')
+
+      menuSocket.value.onopen = () => {
+        console.log('✅ WebSocket меню подключен')
+        menuIsConnected.value = true
+        menuIsConnecting.value = false
+        menuConnectionError.value = null
+        menuReconnectAttempts.value = 0
+
+        if (menuReconnectInterval.value) {
+          clearTimeout(menuReconnectInterval.value)
+          menuReconnectInterval.value = null
+        }
+      }
+
+      menuSocket.value.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data)
+          console.log('📨 WebSocket меню обновлено:', msg)
+
+          if (msg.type === 'menu_item_status_changed') {
+            console.log('🍽️ Изменен статус блюда:', msg.id, 'is_active:', msg.is_active)
+
+            // Обновляем статус блюда в меню
+            const menuStore = useMenuStore()
+            menuStore.updateMenuItemStatusFromWebSocket(msg.id, msg.is_active)
+          }
+        } catch (e) {
+          console.error('❌ Ошибка парсинга WebSocket сообщения меню:', e)
+        }
+      }
+
+      menuSocket.value.onclose = (event) => {
+        console.log('🔌 WebSocket меню закрыт:', event.code, event.reason)
+        menuIsConnected.value = false
+        menuIsConnecting.value = false
+
+        if (event.code !== 1000) {
+          scheduleMenuReconnect()
+        }
+      }
+
+      menuSocket.value.onerror = (error) => {
+        console.error('❌ WebSocket меню ошибка:', error)
+        menuConnectionError.value = 'Ошибка подключения к серверу'
+        menuIsConnecting.value = false
+      }
+    } catch (error) {
+      console.error('❌ Ошибка создания WebSocket меню:', error)
+      menuConnectionError.value = error.message
+      menuIsConnecting.value = false
+    }
+  }
+
+  const disconnectMenuSocket = () => {
+    if (menuReconnectInterval.value) {
+      clearTimeout(menuReconnectInterval.value)
+      menuReconnectInterval.value = null
+    }
+
+    if (menuSocket.value) {
+      menuSocket.value.close(1000, 'Client disconnect')
+      menuSocket.value = null
+    }
+
+    menuIsConnected.value = false
+    menuIsConnecting.value = false
+    menuConnectionError.value = null
+    menuReconnectAttempts.value = 0
+  }
+
+  const scheduleMenuReconnect = () => {
+    if (menuReconnectAttempts.value >= maxReconnectAttempts.value) {
+      console.error('❌ Превышено максимальное количество попыток переподключения WebSocket меню')
+      menuConnectionError.value = 'Не удалось подключиться к серверу'
+      return
+    }
+
+    menuReconnectAttempts.value++
+    const delay = Math.min(1000 * Math.pow(2, menuReconnectAttempts.value), 30000)
+
+    console.log(
+      `🔄 Попытка переподключения WebSocket меню ${menuReconnectAttempts.value}/${maxReconnectAttempts.value} через ${delay}ms`,
+    )
+
+    menuReconnectInterval.value = setTimeout(() => {
+      connectMenuSocket()
+    }, delay)
+  }
+
   return {
     // State для WebSocket заказов
     isConnected,
@@ -470,11 +876,29 @@ export const useWebSocketStore = defineStore('websocket', () => {
     reconnectAttempts,
     maxReconnectAttempts,
 
-    // State для WebSocket официанта
-    waiterIsConnected,
-    waiterIsConnecting,
-    waiterConnectionError,
-    waiterReconnectAttempts,
+    // State для WebSocket уведомлений (notifications)
+    notificationsIsConnected,
+    notificationsIsConnecting,
+    notificationsConnectionError,
+    notificationsReconnectAttempts,
+
+    // State для WebSocket всех уведомлений (notifications/all)
+    allNotificationsIsConnected,
+    allNotificationsIsConnecting,
+    allNotificationsConnectionError,
+    allNotificationsReconnectAttempts,
+
+    // State для WebSocket изображений
+    imagesIsConnected,
+    imagesIsConnecting,
+    imagesConnectionError,
+    imagesReconnectAttempts,
+
+    // State для WebSocket меню
+    menuIsConnected,
+    menuIsConnecting,
+    menuConnectionError,
+    menuReconnectAttempts,
 
     // State для WebSocket статуса устройств
     deviceStatusIsConnected,
@@ -483,16 +907,31 @@ export const useWebSocketStore = defineStore('websocket', () => {
     deviceStatusReconnectAttempts,
     deviceStatusConnectionStatus,
 
-    // Actions
+    // Actions для WebSocket заказов
     connect,
     disconnect,
     sendMessage,
     scheduleReconnect,
 
-    // Actions для WebSocket официанта
-    connectWaiterSocket,
-    disconnectWaiterSocket,
-    scheduleWaiterReconnect,
+    // Actions для WebSocket уведомлений
+    connectNotificationsSocket,
+    disconnectNotificationsSocket,
+    scheduleNotificationsReconnect,
+
+    // Actions для WebSocket всех уведомлений
+    connectAllNotificationsSocket,
+    disconnectAllNotificationsSocket,
+    scheduleAllNotificationsReconnect,
+
+    // Actions для WebSocket изображений
+    connectImagesSocket,
+    disconnectImagesSocket,
+    scheduleImagesReconnect,
+
+    // Actions для WebSocket меню
+    connectMenuSocket,
+    disconnectMenuSocket,
+    scheduleMenuReconnect,
 
     // Actions для WebSocket статуса устройств
     connectDeviceStatusSocket,

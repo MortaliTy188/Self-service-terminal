@@ -37,6 +37,14 @@
         </div>
 
         <div class="item-actions">
+          <button
+            class="suggestions-btn"
+            @click="openSuggestionsPopup(item)"
+            title="Настроить рекомендации"
+          >
+            Рекомендации
+          </button>
+
           <!-- <button class="edit-btn" @click="editItem(item)" title="Редактировать товар">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
               <path d="M3 17.25V21H6.75L17.81 9.94L14.06 6.19L3 17.25Z" fill="currentColor" />
@@ -191,12 +199,87 @@
         </div>
       </div>
     </div>
+
+    <!-- Popup для управления рекомендациями -->
+    <div v-if="showSuggestionsPopup" class="popup-overlay" @click="closeSuggestionsPopup">
+      <div class="suggestions-popup" @click.stop>
+        <div class="popup-header">
+          <h2>Рекомендации для "{{ selectedItemForSuggestions?.name }}"</h2>
+          <button class="close-btn" @click="closeSuggestionsPopup">×</button>
+        </div>
+
+        <div class="suggestions-content">
+          <!-- Текущие рекомендации -->
+          <div class="current-suggestions">
+            <h3>Текущие рекомендации</h3>
+            <div v-if="currentSuggestions.length === 0" class="empty-message">
+              Рекомендаций пока нет. Добавьте блюда из списка ниже.
+            </div>
+            <div v-else class="suggestions-list">
+              <div
+                v-for="suggestion in currentSuggestions"
+                :key="suggestion.id"
+                class="suggestion-item"
+              >
+                <div class="suggestion-info">
+                  <span class="suggestion-name">{{ suggestion.name }}</span>
+                  <span class="suggestion-price">{{ formatPrice(suggestion.price) }} ₽</span>
+                </div>
+                <div class="suggestion-controls">
+                  <input
+                    type="number"
+                    v-model.number="suggestion.priority"
+                    min="1"
+                    max="100"
+                    class="priority-input"
+                    @change="updateSuggestionPriority(suggestion)"
+                  />
+                  <button
+                    class="btn-remove-suggestion"
+                    @click="removeSuggestion(suggestion.id)"
+                    title="Удалить рекомендацию"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Добавление новых рекомендаций -->
+          <div class="add-suggestions">
+            <h3>Добавить блюда</h3>
+            <div class="available-items-list">
+              <div
+                v-for="item in availableMenuItems"
+                :key="item.id"
+                class="available-item"
+                @click="addSuggestion(item)"
+              >
+                <div class="item-info">
+                  <span class="item-name">{{ item.name }}</span>
+                  <span class="item-category-badge">{{ getCategoryName(item.category_id) }}</span>
+                </div>
+                <span class="item-price">{{ formatPrice(item.price) }} ₽</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="popup-actions">
+          <button class="btn-cancel" @click="closeSuggestionsPopup">Отмена</button>
+          <button class="btn-save" @click="saveSuggestions" :disabled="isSavingSuggestions">
+            {{ isSavingSuggestions ? 'Сохранение...' : 'Сохранить' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed } from 'vue'
-import { useMenuStore, useApiConfigStore } from '@/stores'
+import { useMenuStore, useApiConfigStore, useAuthStore } from '@/stores'
 import placeholderImage from '@/assets/image 28.png'
 import EditItemPopup from './EditItemPopup.vue'
 import './CategoryManagement.css'
@@ -237,9 +320,16 @@ const newCategoryName = ref('')
 const editingCategory = ref(null)
 const editCategoryName = ref('')
 
+// Состояние попапа рекомендаций
+const showSuggestionsPopup = ref(false)
+const selectedItemForSuggestions = ref(null)
+const currentSuggestions = ref([])
+const isSavingSuggestions = ref(false)
+
 // Получаем категории для отображения названий
 const menuStore = useMenuStore()
 const apiConfigStore = useApiConfigStore()
+const authStore = useAuthStore()
 const categories = computed(() => menuStore.categories || [])
 
 const getCategoryName = (categoryId) => {
@@ -408,6 +498,139 @@ const deleteCategory = async (categoryId) => {
     } catch (error) {
       console.error('Ошибка при удалении категории:', error)
     }
+  }
+}
+
+// ========== Функции для управления рекомендациями ==========
+
+// Доступные блюда для добавления (исключая текущее блюдо и уже добавленные рекомендации)
+const availableMenuItems = computed(() => {
+  if (!selectedItemForSuggestions.value) return []
+
+  const currentItemId = selectedItemForSuggestions.value.id
+  const suggestionIds = currentSuggestions.value.map((s) => s.id)
+
+  return props.menuItems.filter(
+    (item) =>
+      item.id !== currentItemId && !suggestionIds.includes(item.id) && item.is_active !== false,
+  )
+})
+
+// Открыть попап рекомендаций
+const openSuggestionsPopup = async (item) => {
+  selectedItemForSuggestions.value = item
+  currentSuggestions.value = []
+  showSuggestionsPopup.value = true
+
+  // Загружаем текущие рекомендации с сервера
+  await loadSuggestions(item.id)
+}
+
+// Закрыть попап рекомендаций
+const closeSuggestionsPopup = () => {
+  showSuggestionsPopup.value = false
+  selectedItemForSuggestions.value = null
+  currentSuggestions.value = []
+}
+
+// Загрузить рекомендации для блюда
+const loadSuggestions = async (itemId) => {
+  try {
+    const response = await fetch(apiConfigStore.getSecureUrl(`/api/menu/${itemId}/suggestions`), {
+      method: 'GET',
+    })
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        console.log('Рекомендаций пока нет')
+        currentSuggestions.value = []
+        return
+      }
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const data = await response.json()
+    currentSuggestions.value = data.suggestions || []
+    console.log('Загружены рекомендации:', currentSuggestions.value)
+  } catch (error) {
+    console.error('Ошибка загрузки рекомендаций:', error)
+    currentSuggestions.value = []
+  }
+}
+
+// Добавить блюдо в рекомендации
+const addSuggestion = (item) => {
+  const maxPriority =
+    currentSuggestions.value.length > 0
+      ? Math.max(...currentSuggestions.value.map((s) => s.priority || 0))
+      : 0
+
+  currentSuggestions.value.push({
+    id: item.id,
+    name: item.name,
+    price: item.price,
+    priority: maxPriority + 1,
+  })
+}
+
+// Удалить рекомендацию
+const removeSuggestion = (suggestionId) => {
+  const index = currentSuggestions.value.findIndex((s) => s.id === suggestionId)
+  if (index !== -1) {
+    currentSuggestions.value.splice(index, 1)
+  }
+}
+
+// Обновить приоритет рекомендации
+const updateSuggestionPriority = (suggestion) => {
+  // Приоритет обновляется автоматически через v-model
+  console.log('Обновлен приоритет:', suggestion)
+}
+
+// Сохранить рекомендации
+const saveSuggestions = async () => {
+  if (!selectedItemForSuggestions.value) return
+
+  isSavingSuggestions.value = true
+
+  try {
+    const itemId = selectedItemForSuggestions.value.id
+
+    // Формируем тело запроса
+    const requestBody = {
+      suggestions: currentSuggestions.value.map((s) => ({
+        menu_item_id: s.id,
+        priority: s.priority || 1,
+      })),
+    }
+
+    console.log('Сохраняем рекомендации:', requestBody)
+
+    const response = await fetch(
+      apiConfigStore.getSecureUrl(`/api/admin/menu/${itemId}/suggestions`),
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Admin-Session': authStore.sessionId || '',
+        },
+        body: JSON.stringify(requestBody),
+      },
+    )
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`)
+    }
+
+    console.log('✅ Рекомендации успешно сохранены')
+    alert('Рекомендации успешно сохранены!')
+    closeSuggestionsPopup()
+  } catch (error) {
+    console.error('❌ Ошибка сохранения рекомендаций:', error)
+    alert(`Ошибка сохранения: ${error.message}`)
+  } finally {
+    isSavingSuggestions.value = false
   }
 }
 </script>
@@ -933,5 +1156,427 @@ const deleteCategory = async (categoryId) => {
 
 .add-btn:hover {
   background: #e55a2b;
+}
+
+/* Стили для попапа рекомендаций */
+.suggestions-popup {
+  width: 90%;
+  max-width: 900px;
+  max-height: 85vh;
+  background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
+  border-radius: 20px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.suggestions-popup .popup-header {
+  background: linear-gradient(135deg, #45a049 0%, #3d8b40 100%);
+  color: white;
+  padding: 24px 32px;
+  border-bottom: none;
+  box-shadow: 0 4px 12px rgba(69, 160, 73, 0.2);
+}
+
+.suggestions-popup .popup-header h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: white;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.suggestions-popup .close-btn {
+  width: 36px;
+  height: 36px;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  font-size: 24px;
+  font-weight: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+}
+
+.suggestions-popup .close-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: rotate(90deg);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.suggestions-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  background: white;
+}
+
+.suggestions-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.suggestions-content::-webkit-scrollbar-track {
+  background: #f3f4f6;
+  border-radius: 4px;
+}
+
+.suggestions-content::-webkit-scrollbar-thumb {
+  background: #45a049;
+  border-radius: 4px;
+}
+
+.suggestions-content::-webkit-scrollbar-thumb:hover {
+  background: #3d8b40;
+}
+
+.current-suggestions,
+.add-suggestions {
+  background: linear-gradient(135deg, #ffffff 0%, #f1f8f4 100%);
+  border-radius: 16px;
+  padding: 24px;
+  border: 2px solid #c8e6c9;
+  box-shadow: 0 4px 12px rgba(69, 160, 73, 0.08);
+}
+
+.current-suggestions h3,
+.add-suggestions h3 {
+  margin: 0 0 20px 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #1f2937;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.current-suggestions h3::before {
+  content: '⭐';
+  font-size: 24px;
+}
+
+.add-suggestions h3::before {
+  content: '➕';
+  font-size: 20px;
+}
+
+.suggestions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.suggestion-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: white;
+  border: 2px solid #c8e6c9;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.suggestion-item:hover {
+  background: linear-gradient(135deg, #f1f8f4 0%, #c8e6c9 100%);
+  border-color: #45a049;
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(69, 160, 73, 0.15);
+}
+
+.suggestion-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.suggestion-name {
+  font-weight: 600;
+  color: #1f2937;
+  font-size: 16px;
+}
+
+.suggestion-price {
+  font-size: 14px;
+  color: #45a049;
+  font-weight: 600;
+}
+
+.suggestion-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.priority-input {
+  width: 70px;
+  padding: 8px 12px;
+  border: 2px solid #45a049;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: center;
+  background: white;
+  color: #3d8b40;
+  transition: all 0.2s ease;
+}
+
+.priority-input:focus {
+  outline: none;
+  border-color: #3d8b40;
+  box-shadow: 0 0 0 4px rgba(69, 160, 73, 0.1);
+  transform: scale(1.05);
+}
+
+.btn-remove-suggestion {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+  color: #dc2626;
+  border: 2px solid #fecaca;
+  border-radius: 10px;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-remove-suggestion:hover {
+  background: linear-gradient(135deg, #fecaca 0%, #fca5a5 100%);
+  border-color: #dc2626;
+  transform: scale(1.1) rotate(-5deg);
+}
+
+.empty-message {
+  padding: 32px 20px;
+  text-align: center;
+  color: #9ca3af;
+  font-style: italic;
+  background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+  border-radius: 12px;
+  border: 2px dashed #d1d5db;
+}
+
+.available-items-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.available-items-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.available-items-list::-webkit-scrollbar-track {
+  background: #f3f4f6;
+  border-radius: 4px;
+}
+
+.available-items-list::-webkit-scrollbar-thumb {
+  background: #45a049;
+  border-radius: 4px;
+}
+
+.available-item {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  background: white;
+  border: 2px solid #f3f4f6;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+
+.available-item:hover {
+  background: linear-gradient(135deg, #f1f8f4 0%, #c8e6c9 100%);
+  border-color: #45a049;
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(69, 160, 73, 0.2);
+}
+
+.available-item .item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.available-item .item-name {
+  font-weight: 600;
+  color: #1f2937;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.item-category-badge {
+  align-self: flex-start;
+  padding: 4px 10px;
+  background: linear-gradient(135deg, #c8e6c9 0%, #a5d6a7 100%);
+  color: #2e7d32;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.available-item .item-price {
+  font-weight: 700;
+  font-size: 18px;
+  color: #45a049;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.available-item .item-price::before {
+  content: '₽';
+  font-size: 14px;
+}
+
+.suggestions-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  background: linear-gradient(135deg, #45a049 0%, #3d8b40 100%);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(69, 160, 73, 0.3);
+}
+
+.suggestions-btn:hover {
+  background: linear-gradient(135deg, #3d8b40 0%, #2e7d32 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(69, 160, 73, 0.4);
+}
+
+.suggestions-btn:active {
+  transform: translateY(0);
+}
+
+.suggestions-btn svg {
+  flex-shrink: 0;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+.suggestions-popup .popup-actions {
+  padding: 20px 32px;
+  background: linear-gradient(to top, #f9fafb 0%, #ffffff 100%);
+  border-top: 2px solid #f3f4f6;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.suggestions-popup .btn-cancel {
+  padding: 12px 28px;
+  background: white;
+  color: #6b7280;
+  border: 2px solid #d1d5db;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.suggestions-popup .btn-cancel:hover {
+  background: #f9fafb;
+  border-color: #9ca3af;
+  color: #374151;
+}
+
+.suggestions-popup .btn-save {
+  padding: 12px 28px;
+  background: linear-gradient(135deg, #45a049 0%, #3d8b40 100%);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(69, 160, 73, 0.3);
+}
+
+.suggestions-popup .btn-save:hover:not(:disabled) {
+  background: linear-gradient(135deg, #3d8b40 0%, #2e7d32 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(69, 160, 73, 0.4);
+}
+
+.suggestions-popup .btn-save:disabled {
+  background: #d1d5db;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+@media (max-width: 768px) {
+  .suggestions-popup {
+    width: 95%;
+    max-height: 90vh;
+  }
+
+  .suggestions-content {
+    padding: 20px;
+    gap: 24px;
+  }
+
+  .current-suggestions,
+  .add-suggestions {
+    padding: 16px;
+  }
+
+  .available-items-list {
+    grid-template-columns: 1fr;
+  }
+
+  .suggestion-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .suggestion-controls {
+    width: 100%;
+    justify-content: space-between;
+  }
 }
 </style>

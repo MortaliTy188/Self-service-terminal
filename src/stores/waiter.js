@@ -9,6 +9,7 @@ export const useWaiterStore = defineStore('waiter', () => {
 
   // State
   const notifications = ref([])
+  const allNotifications = ref([]) // Полный список всех уведомлений для вкладки
   const isLoading = ref(false)
   const error = ref(null)
   const callHistory = ref([])
@@ -67,13 +68,14 @@ export const useWaiterStore = defineStore('waiter', () => {
     const requestData = {
       table_id: String(tableNumber),
       message: message || `Вызов официанта от стола ${tableNumber}`,
+      type: 'call_waiter',
     }
 
     console.log('📞 Вызов официанта:', requestData)
-    console.log('🔗 API URL:', `${apiConfigStore.baseUrl}/call-waiter`)
+    console.log('🔗 API URL:', `${apiConfigStore.baseUrl}/api/notifications`)
 
     try {
-      const response = await fetch(`${apiConfigStore.baseUrl}/call-waiter`, {
+      const response = await fetch(`${apiConfigStore.baseUrl}/api/notifications`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -88,14 +90,14 @@ export const useWaiterStore = defineStore('waiter', () => {
 
       const result = await response.json()
 
-      // Добавляем в историю вызовов
+      // Добавляем в историю вызовов используя данные из ответа API
       const callRecord = {
-        id: Date.now(),
+        id: result.id || Date.now(),
         tableNumber: parseInt(tableNumber),
-        message: requestData.message,
-        timestamp: new Date().toISOString(),
+        message: result.message || requestData.message,
+        timestamp: result.created_at || new Date().toISOString(),
         type: 'waiter_call',
-        status: 'sent',
+        status: result.status || 'new',
       }
 
       callHistory.value.unshift(callRecord)
@@ -304,9 +306,134 @@ export const useWaiterStore = defineStore('waiter', () => {
     }
   }
 
+  /**
+   * Установка полного списка уведомлений (для вкладки "Все уведомления")
+   * Используется с WebSocket /ws/notifications/all
+   */
+  const setAllNotifications = (notificationsList) => {
+    try {
+      console.log('📋 Установка полного списка уведомлений:', notificationsList.length)
+
+      // Преобразуем формат API в формат store
+      allNotifications.value = notificationsList.map((notif) => ({
+        id: notif.id,
+        tableNumber: parseInt(notif.table_id) || 0,
+        message: notif.message,
+        type: notif.type, // call_waiter, payment_request, problem
+        status: notif.status, // new, resolved, etc
+        timestamp: notif.created_at,
+        resolved: notif.status !== 'new',
+        resolvedAt: notif.updated_at !== notif.created_at ? notif.updated_at : null,
+        priority: 'normal',
+      }))
+
+      console.log('✅ Список уведомлений обновлен')
+    } catch (error) {
+      console.error('❌ Ошибка установки списка уведомлений:', error)
+    }
+  }
+
+  /**
+   * Загрузка всех уведомлений с сервера
+   */
+  const loadAllNotifications = async () => {
+    isLoading.value = true
+    error.value = null
+
+    try {
+      const response = await fetch(`${apiConfigStore.baseUrl}/api/notifications`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error(`Ошибка ${response.status}: ${response.statusText}`)
+      }
+
+      const data = await response.json()
+      console.log('📥 Загружены все уведомления:', data)
+
+      // Используем метод setAllNotifications для обработки
+      setAllNotifications(data)
+
+      return { success: true, data }
+    } catch (err) {
+      console.error('❌ Ошибка загрузки уведомлений:', err)
+      error.value = err.message
+      mainStore.addNotification({
+        type: 'error',
+        title: 'Ошибка загрузки',
+        message: 'Не удалось загрузить уведомления',
+        duration: 5000,
+      })
+      return { success: false, error: err.message }
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  /**
+   * Обновление статуса уведомления
+   */
+  const updateNotificationStatus = async (notificationId, newStatus) => {
+    try {
+      console.log('🔄 Обновление статуса уведомления:', notificationId, newStatus)
+
+      const response = await fetch(
+        `${apiConfigStore.baseUrl}/api/notifications/${notificationId}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ status: newStatus }),
+        },
+      )
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || `Ошибка ${response.status}: ${response.statusText}`)
+      }
+
+      const result = await response.json()
+      console.log('✅ Статус уведомления обновлен:', result)
+
+      // Обновляем локально
+      const notification = allNotifications.value.find((n) => n.id === notificationId)
+      if (notification) {
+        notification.status = newStatus
+        notification.resolved = newStatus !== 'new'
+        notification.resolvedAt = newStatus !== 'new' ? new Date().toISOString() : null
+      }
+
+      mainStore.addNotification({
+        type: 'success',
+        title: 'Статус обновлен',
+        message:
+          newStatus === 'resolved' ? 'Уведомление отмечено как обработанное' : 'Статус изменен',
+        duration: 3000,
+      })
+
+      return { success: true, data: result }
+    } catch (err) {
+      console.error('❌ Ошибка обновления статуса:', err)
+      error.value = err.message
+      mainStore.addNotification({
+        type: 'error',
+        title: 'Ошибка',
+        message: err.message || 'Не удалось обновить статус',
+        duration: 5000,
+      })
+      return { success: false, error: err.message }
+    }
+  }
+
   return {
     // State
     notifications,
+    allNotifications,
     isLoading,
     error,
     callHistory,
@@ -332,5 +459,8 @@ export const useWaiterStore = defineStore('waiter', () => {
     clearCallHistory,
     addNotificationFromWebSocket,
     playNotificationSound,
+    setAllNotifications,
+    loadAllNotifications,
+    updateNotificationStatus,
   }
 })

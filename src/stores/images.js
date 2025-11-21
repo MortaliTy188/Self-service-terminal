@@ -71,7 +71,7 @@ export const useImagesStore = defineStore('images', () => {
 
   /**
    * Получить список всех изображений
-   * Доступно без авторизации для всех устройств
+   * GET /api/images
    * @returns {Object} - Список изображений
    */
   const fetchImages = async () => {
@@ -81,7 +81,6 @@ export const useImagesStore = defineStore('images', () => {
     try {
       console.log('📥 Загружаем список изображений...')
 
-      // GET /api/images доступен без авторизации
       const response = await fetch(apiConfigStore.getSecureUrl('/api/images'), {
         method: 'GET',
       })
@@ -96,12 +95,13 @@ export const useImagesStore = defineStore('images', () => {
 
       images.value = result
 
-      // Если есть изображения, устанавливаем первое как текущее (если не установлено)
-      if (result.length > 0 && !currentSplashImage.value) {
-        // Сохраняем полный URL с baseUrl
-        const firstImageUrl = apiConfigStore.getSecureUrl(result[0].url)
-        currentSplashImage.value = firstImageUrl
-        setCurrentSplashImage(firstImageUrl)
+      // Находим активное изображение (is_active: true)
+      const activeImage = result.find((img) => img.is_active)
+      if (activeImage) {
+        const activeImageUrl = apiConfigStore.getSecureUrl(activeImage.url)
+        currentSplashImage.value = activeImageUrl
+        setCurrentSplashImage(activeImageUrl)
+        console.log('🎯 Найдено активное изображение:', activeImageUrl)
       }
 
       return {
@@ -121,7 +121,55 @@ export const useImagesStore = defineStore('images', () => {
   }
 
   /**
+   * Получить активную картинку
+   * GET /api/images/active
+   * @returns {Object} - Активное изображение
+   */
+  const fetchActiveImage = async () => {
+    try {
+      console.log('📥 Загружаем активную картинку...')
+
+      const response = await fetch(apiConfigStore.getSecureUrl('/api/images/active'), {
+        method: 'GET',
+      })
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          console.log('⚠️ Активная картинка не найдена')
+          return {
+            success: true,
+            data: null,
+          }
+        }
+        const errorText = await response.text()
+        throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`)
+      }
+
+      const result = await response.json()
+      console.log('✅ Активная картинка загружена:', result)
+
+      if (result && result.url) {
+        const activeImageUrl = apiConfigStore.getSecureUrl(result.url)
+        currentSplashImage.value = activeImageUrl
+        setCurrentSplashImage(activeImageUrl)
+      }
+
+      return {
+        success: true,
+        data: result,
+      }
+    } catch (err) {
+      console.error('❌ Ошибка загрузки активной картинки:', err)
+      return {
+        success: false,
+        error: err.message,
+      }
+    }
+  }
+
+  /**
    * Удалить изображение
+   * DELETE /api/images/{id}
    * @param {Number} id - ID изображения
    * @returns {Object} - Результат удаления
    */
@@ -171,6 +219,61 @@ export const useImagesStore = defineStore('images', () => {
   }
 
   /**
+   * Сделать картинку активной (стартовой)
+   * PATCH /api/images/{id}
+   * @param {Number} id - ID изображения
+   * @returns {Object} - Результат операции
+   */
+  const setActiveImage = async (id) => {
+    isLoading.value = true
+    error.value = null
+
+    try {
+      console.log('🎯 Устанавливаем активное изображение:', id)
+      console.log('📍 URL:', apiConfigStore.getSecureUrl(`/api/images/${id}`))
+
+      const headers = {}
+      if (authStore.sessionId) {
+        headers['X-Admin-Session'] = authStore.sessionId
+        console.log('🔑 Используем Admin Session')
+      }
+
+      // PATCH без тела запроса, согласно документации
+      const response = await fetch(apiConfigStore.getSecureUrl(`/api/images/${id}`), {
+        method: 'PATCH',
+        headers,
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('❌ Ответ сервера:', response.status, errorText)
+        throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`)
+      }
+
+      const result = await response.json()
+      console.log('✅ Изображение установлено как активное:', result)
+
+      // Обновляем список изображений, чтобы получить актуальное состояние is_active
+      await fetchImages()
+
+      return {
+        success: true,
+        data: result,
+        message: 'Изображение установлено как стартовое',
+      }
+    } catch (err) {
+      console.error('❌ Ошибка установки активного изображения:', err)
+      error.value = err.message
+      return {
+        success: false,
+        error: err.message,
+      }
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  /**
    * Установить текущее изображение для заставки
    * @param {String} imageUrl - URL изображения
    */
@@ -181,6 +284,44 @@ export const useImagesStore = defineStore('images', () => {
     // Сохраняем в localStorage для быстрого доступа
     localStorage.setItem('current_splash_image', urlString)
     console.log('✅ Установлено изображение заставки:', urlString)
+  }
+
+  /**
+   * Обработка события image_updated из WebSocket
+   * @param {Object} imageData - Данные изображения из WebSocket
+   */
+  const updateImageFromWebSocket = (imageData) => {
+    try {
+      console.log('🔔 WebSocket: Обновление изображения:', imageData)
+
+      // Если это активное изображение, обновляем текущее
+      if (imageData.is_active) {
+        const imageUrl = apiConfigStore.getSecureUrl(imageData.url)
+        currentSplashImage.value = imageUrl
+        setCurrentSplashImage(imageUrl)
+        console.log('✅ Активное изображение обновлено через WebSocket')
+      }
+
+      // Обновляем список изображений
+      const existingIndex = images.value.findIndex((img) => img.id === imageData.id)
+      if (existingIndex !== -1) {
+        // Обновляем существующее
+        images.value[existingIndex] = imageData
+      } else {
+        // Добавляем новое
+        images.value.unshift(imageData)
+      }
+
+      // Если новое изображение активное, деактивируем остальные
+      if (imageData.is_active) {
+        images.value = images.value.map((img) => ({
+          ...img,
+          is_active: img.id === imageData.id,
+        }))
+      }
+    } catch (err) {
+      console.error('❌ Ошибка обработки WebSocket события:', err)
+    }
   }
 
   /**
@@ -221,23 +362,21 @@ export const useImagesStore = defineStore('images', () => {
 
   /**
    * Проверить и обновить изображение заставки с сервера
-   * Автоматически обновляет текущее изображение если на сервере появилось новое
+   * Использует GET /api/images/active для получения активного изображения
    * @returns {Object} - Результат проверки
    */
   const checkAndUpdateSplashImage = async () => {
     try {
       console.log('🔄 Проверяем обновления изображения заставки...')
 
-      const result = await fetchImages()
+      const result = await fetchActiveImage()
 
-      if (result.success && result.data.length > 0) {
-        // Берем первое изображение из списка (самое свежее)
-        const latestImage = result.data[0]
-        const latestImageUrl = apiConfigStore.getSecureUrl(latestImage.url)
+      if (result.success && result.data && result.data.url) {
+        const latestImageUrl = apiConfigStore.getSecureUrl(result.data.url)
 
         // Проверяем, отличается ли от текущего
         if (currentSplashImage.value !== latestImageUrl) {
-          console.log('🆕 Обнаружено новое изображение, обновляем...')
+          console.log('🆕 Обнаружено новое активное изображение, обновляем...')
           console.log('Старое:', currentSplashImage.value)
           console.log('Новое:', latestImageUrl)
 
@@ -259,7 +398,7 @@ export const useImagesStore = defineStore('images', () => {
 
       return {
         success: false,
-        error: 'Нет доступных изображений',
+        error: 'Нет активного изображения',
       }
     } catch (err) {
       console.error('❌ Ошибка проверки обновлений изображения:', err)
@@ -314,10 +453,13 @@ export const useImagesStore = defineStore('images', () => {
     // Actions
     uploadImage,
     fetchImages,
+    fetchActiveImage,
     deleteImage,
+    setActiveImage,
     setCurrentSplashImage,
     loadCurrentSplashImage,
     getImageUrl,
+    updateImageFromWebSocket,
     checkAndUpdateSplashImage,
     startAutoUpdate,
     stopAutoUpdate,

@@ -19,6 +19,13 @@
         </button>
         <button
           class="control-button"
+          :class="{ active: activeTab === 'notifications' }"
+          @click="$emit('tab-change', 'notifications')"
+        >
+          <span>Уведомления</span>
+        </button>
+        <button
+          class="control-button"
           :class="{ active: activeTab === 'devices' }"
           @click="$emit('tab-change', 'devices')"
         >

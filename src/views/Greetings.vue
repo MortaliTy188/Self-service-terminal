@@ -1,12 +1,13 @@
 <script setup>
 import { useRouter } from 'vue-router'
-import { useSettingsStore, useApiConfigStore, useImagesStore } from '@/stores'
-import { onMounted, computed } from 'vue'
+import { useSettingsStore, useApiConfigStore, useImagesStore, useWebSocketStore } from '@/stores'
+import { onMounted, onUnmounted, computed } from 'vue'
 
 const router = useRouter()
 const settingsStore = useSettingsStore()
 const apiConfigStore = useApiConfigStore()
 const imagesStore = useImagesStore()
+const webSocketStore = useWebSocketStore()
 
 // Computed свойство для фона с изображением
 const backgroundStyle = computed(() => {
@@ -62,18 +63,26 @@ onMounted(async () => {
   await apiConfigStore.fetchConfig()
   console.log('Конфигурация загружена:', apiConfigStore.config)
 
-  // Загружаем текущее изображение заставки
-  imagesStore.loadCurrentSplashImage()
-  console.log(
-    'Текущее изображение заставки (тип: %s):',
-    typeof imagesStore.currentSplashImage,
-    imagesStore.currentSplashImage,
-  )
-
-  // Если это объект, выводим предупреждение
-  if (imagesStore.currentSplashImage && typeof imagesStore.currentSplashImage === 'object') {
-    console.warn('⚠️ ВНИМАНИЕ: currentSplashImage - объект, а должна быть строка!')
+  // Загружаем активное изображение заставки с сервера
+  // Используем новый API GET /api/images/active
+  const result = await imagesStore.fetchActiveImage()
+  if (result.success && result.data) {
+    console.log('✅ Активное изображение загружено:', result.data)
+  } else {
+    // Если нет активного изображения, пробуем загрузить из localStorage
+    imagesStore.loadCurrentSplashImage()
+    console.log('📱 Загружено изображение из localStorage:', imagesStore.currentSplashImage)
   }
+
+  // Подключаем WebSocket для обновления изображения в реальном времени
+  console.log('🔌 Подключение WebSocket изображений на странице приветствия...')
+  webSocketStore.connectImagesSocket()
+})
+
+// Очистка при размонтировании
+onUnmounted(() => {
+  console.log('🔌 Отключение WebSocket изображений на странице приветствия...')
+  webSocketStore.disconnectImagesSocket()
 })
 </script>
 

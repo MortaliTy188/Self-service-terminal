@@ -540,15 +540,25 @@ const openSplashSettings = async () => {
   // Загружаем список изображений с сервера
   await imagesStore.fetchImages()
 
+  // Находим активное изображение (is_active: true)
+  const activeImage = imagesStore.images.find((img) => img.is_active)
+  let currentImageUrl = ''
+
+  if (activeImage) {
+    currentImageUrl = apiConfigStore.getSecureUrl(activeImage.url)
+  } else if (imagesStore.currentSplashImage) {
+    currentImageUrl = imagesStore.currentSplashImage
+  }
+
   // Загружаем текущие сохраненные настройки при открытии попапа
   const currentSettings = savedSplashSettings.value || {
-    currentImage: imagesStore.currentSplashImage || '',
+    currentImage: currentImageUrl,
     duration: 3,
     showOnStartup: true,
   }
 
   splashSettings.value = {
-    currentImage: currentSettings.currentImage || imagesStore.currentSplashImage || '',
+    currentImage: currentImageUrl || currentSettings.currentImage,
     duration: currentSettings.duration,
     showOnStartup: currentSettings.showOnStartup,
   }
@@ -678,25 +688,45 @@ const testApiConnection = async () => {
   }
 }
 
-const saveSplashSettings = () => {
+const saveSplashSettings = async () => {
   console.log('Сохранение настроек заставки:', splashSettings.value)
 
-  // Сохраняем URL изображения вместо base64
-  if (splashSettings.value.currentImage) {
-    imagesStore.setCurrentSplashImage(splashSettings.value.currentImage)
+  try {
+    // Находим ID выбранного изображения
+    const selectedImageUrl = splashSettings.value.currentImage
+    const selectedImage = imagesStore.images.find(
+      (img) => apiConfigStore.getSecureUrl(img.url) === selectedImageUrl,
+    )
+
+    if (selectedImage && selectedImage.id) {
+      // Используем новый API для установки активного изображения
+      const result = await imagesStore.setActiveImage(selectedImage.id)
+
+      if (result.success) {
+        console.log('✅ Изображение установлено как активное:', selectedImage.id)
+
+        // Сохраняем остальные настройки через hooks
+        settingsStore.updateSplashDuration(splashSettings.value.duration)
+        settingsStore.updateShowOnStartup(splashSettings.value.showOnStartup)
+
+        // Также эмитим событие для родительского компонента
+        emit('save-settings', { type: 'splash', data: splashSettings.value })
+
+        alert(
+          'Настройки заставки сохранены! Изменения будут видны при следующем переходе на стартовую страницу.',
+        )
+        closeSplashPopup()
+      } else {
+        console.error('❌ Ошибка установки активного изображения:', result.error)
+        alert(`Ошибка сохранения: ${result.error}`)
+      }
+    } else {
+      alert('Пожалуйста, выберите изображение')
+    }
+  } catch (error) {
+    console.error('❌ Ошибка при сохранении настроек:', error)
+    alert(`Ошибка: ${error.message}`)
   }
-
-  // Сохраняем остальные настройки через hooks
-  settingsStore.updateSplashDuration(splashSettings.value.duration)
-  settingsStore.updateShowOnStartup(splashSettings.value.showOnStartup)
-
-  // Также эмитим событие для родительского компонента
-  emit('save-settings', { type: 'splash', data: splashSettings.value })
-
-  alert(
-    'Настройки заставки сохранены! Изменения будут видны при следующем переходе на стартовую страницу.',
-  )
-  closeSplashPopup()
 }
 
 // Функции для работы с файлами
@@ -724,24 +754,25 @@ const handleImageUpload = async (event) => {
       return
     }
 
-    // Загружаем на сервер
+    // Загружаем на сервер (POST /api/images/upload)
     const result = await imagesStore.uploadImage(file)
 
-    if (result.success) {
+    if (result.success && result.data) {
       console.log('✅ Изображение успешно загружено:', result.data)
 
-      // result.data - это строка URL, например "/uploads/filename.jpg"
-      // Формируем полный URL с базовым адресом
-      const fullImageUrl = apiConfigStore.getSecureUrl(result.data)
+      // result.data содержит объект с полями: id, filename, url, uploaded_at, is_active
+      const uploadedImage = result.data
 
-      // Устанавливаем как текущее изображение заставки
-      imagesStore.setCurrentSplashImage(fullImageUrl)
+      // Формируем полный URL с базовым адресом
+      const fullImageUrl = apiConfigStore.getSecureUrl(uploadedImage.url || uploadedImage)
+
+      // Устанавливаем как текущее выбранное изображение
       splashSettings.value.currentImage = fullImageUrl
 
       // Перезагружаем список изображений
       await imagesStore.fetchImages()
 
-      alert('Изображение успешно загружено!')
+      alert('Изображение успешно загружено! Нажмите "Сохранить" чтобы сделать его активным.')
     } else {
       console.error('❌ Ошибка загрузки:', result.error)
       alert(`Ошибка загрузки изображения: ${result.error}`)
@@ -757,8 +788,9 @@ const handleImageUpload = async (event) => {
 
 // Проверка, выбрано ли изображение
 const isImageSelected = (image) => {
+  // Проверяем как по URL, так и по флагу is_active
   const fullImageUrl = apiConfigStore.getSecureUrl(image.url)
-  return splashSettings.value.currentImage === fullImageUrl
+  return splashSettings.value.currentImage === fullImageUrl || image.is_active
 }
 
 // Выбор изображения из галереи

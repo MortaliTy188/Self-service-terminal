@@ -233,6 +233,43 @@ export const useMenuStore = defineStore('menu', () => {
     selectedCategory.value = null
   }
 
+  /**
+   * Обновление статуса блюда из WebSocket события
+   * @param {string} itemId - ID блюда
+   * @param {boolean} isActive - Новый статус активности
+   */
+  const updateMenuItemStatusFromWebSocket = (itemId, isActive) => {
+    try {
+      console.log('🔵 updateMenuItemStatusFromWebSocket вызван:', { itemId, isActive })
+
+      const item = menuItems.value.find((i) => i.id === itemId)
+
+      if (item) {
+        const oldStatus = item.is_active
+        item.is_active = isActive
+
+        console.log('✅ Статус блюда обновлен:', {
+          id: itemId,
+          name: item.name,
+          oldStatus,
+          newStatus: isActive,
+        })
+
+        // Показываем уведомление
+        mainStore.addNotification({
+          type: 'info',
+          title: 'Меню обновлено',
+          message: `${item.name} ${isActive ? 'активировано' : 'деактивировано'}`,
+          duration: 3000,
+        })
+      } else {
+        console.warn('⚠️ Блюдо не найдено в меню:', itemId)
+      }
+    } catch (error) {
+      console.error('❌ Ошибка обновления статуса блюда из WebSocket:', error)
+    }
+  }
+
   return {
     // State
     menuItems,
@@ -268,5 +305,6 @@ export const useMenuStore = defineStore('menu', () => {
     removeCategory,
     toggleMenuItemAvailability,
     searchMenuItems,
+    updateMenuItemStatusFromWebSocket,
   }
 })

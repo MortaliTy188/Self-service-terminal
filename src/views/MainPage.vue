@@ -18,6 +18,7 @@ import {
   FoodDetailPopup,
   OrderDetailsPopup,
   SuccessNotification,
+  OrderRecommendationsPopup,
 } from '@/components/MainPage'
 
 // Pinia stores
@@ -34,6 +35,7 @@ const showOrderPopup = ref(false)
 const showOrderDetailsPopup = ref(false)
 const showFoodDetailPopup = ref(false)
 const showSuccessNotification = ref(false)
+const showRecommendationsPopup = ref(false)
 const selectedFoodItem = ref(null)
 const tableOrders = ref([]) // Заказы для текущего стола
 
@@ -189,8 +191,21 @@ const closeSuccessNotification = () => {
   showSuccessNotification.value = false
 }
 
-const makeOrder = () => {
+const closeRecommendationsPopup = () => {
+  showRecommendationsPopup.value = false
+}
+
+const confirmOrderFromRecommendations = async () => {
+  // Закрываем модалку с рекомендациями
+  showRecommendationsPopup.value = false
+
+  // Открываем стандартную модалку подтверждения заказа
   showOrderPopup.value = true
+}
+
+const makeOrder = () => {
+  // Открываем модалку с рекомендациями вместо обычной модалки заказа
+  showRecommendationsPopup.value = true
 }
 
 const closeOrderPopup = () => {
@@ -220,12 +235,22 @@ onMounted(async () => {
   // Подключаем WebSocket для получения обновлений в реальном времени
   console.log('🔌 Подключение WebSocket на главной странице...')
   webSocketStore.connect()
+
+  // Подключаем WebSocket для обновления меню в реальном времени
+  console.log('🔌 Подключение WebSocket меню на главной странице...')
+  webSocketStore.connectMenuSocket()
+
+  // Подключаем WebSocket для обновления изображений
+  console.log('🔌 Подключение WebSocket изображений на главной странице...')
+  webSocketStore.connectImagesSocket()
 })
 
 // Очистка при размонтировании
 onUnmounted(() => {
   console.log('🔌 Отключение WebSocket на главной странице...')
   webSocketStore.disconnect()
+  webSocketStore.disconnectMenuSocket()
+  webSocketStore.disconnectImagesSocket()
 })
 </script>
 
@@ -283,6 +308,13 @@ onUnmounted(() => {
     :show="showSuccessNotification"
     :order-details="lastOrder"
     @close="closeSuccessNotification"
+  />
+
+  <OrderRecommendationsPopup
+    :show="showRecommendationsPopup"
+    :cart-items="cartItems"
+    @close="closeRecommendationsPopup"
+    @confirm-order="confirmOrderFromRecommendations"
   />
 </template>
 

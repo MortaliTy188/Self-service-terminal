@@ -647,6 +647,8 @@ export const useOrdersStore = defineStore('orders', () => {
    */
   const addOrderFromWebSocket = (wsOrder) => {
     try {
+      console.log('🔵 addOrderFromWebSocket вызван с данными:', wsOrder)
+
       // Преобразуем формат WebSocket заказа в наш внутренний формат
       const normalizedOrder = {
         id: wsOrder.order_id || wsOrder.id,
@@ -661,16 +663,25 @@ export const useOrdersStore = defineStore('orders', () => {
         tableId: wsOrder.table_id,
         items: wsOrder.items || [],
         itemsText: (wsOrder.items || [])
-          .map((item) => `${item.quantity || 1}x ${item.name || item.title || 'Неизвестно'}`)
+          .map(
+            (item) =>
+              `${item.quantity || item.qty || 1}x ${item.name || item.title || 'Неизвестно'}`,
+          )
           .join(', '),
-        status: wsOrder.status || 'pending',
+        status: mapServerStatus(wsOrder.status) || 'pending',
         totalPrice: wsOrder.total || 0,
-        totalQuantity: (wsOrder.items || []).reduce((sum, item) => sum + (item.quantity || 1), 0),
+        totalQuantity: (wsOrder.items || []).reduce(
+          (sum, item) => sum + (item.quantity || item.qty || 1),
+          0,
+        ),
         createdAt: wsOrder.created_at || new Date().toISOString(),
         customerName: wsOrder.customer_name || '',
         specialRequests: wsOrder.special_requests || '',
+        cartItems: wsOrder.items || [],
         serverData: wsOrder,
       }
+
+      console.log('🔵 Нормализованный заказ:', normalizedOrder)
 
       // Проверяем, нет ли уже такого заказа
       const existingIndex = orders.value.findIndex((order) => order.id === normalizedOrder.id)
@@ -678,7 +689,7 @@ export const useOrdersStore = defineStore('orders', () => {
       if (existingIndex === -1) {
         // Добавляем новый заказ в начало списка
         orders.value.unshift(normalizedOrder)
-        console.log('📋 Заказ добавлен через WebSocket:', normalizedOrder.displayNumber)
+        console.log('✅ Заказ добавлен через WebSocket:', normalizedOrder.displayNumber)
 
         // Показываем уведомление
         mainStore.addNotification({
@@ -688,7 +699,7 @@ export const useOrdersStore = defineStore('orders', () => {
           duration: 5000,
         })
       } else {
-        console.log('📋 Заказ уже существует, пропускаем:', normalizedOrder.displayNumber)
+        console.log('⚠️ Заказ уже существует, пропускаем:', normalizedOrder.displayNumber)
       }
     } catch (error) {
       console.error('❌ Ошибка добавления заказа из WebSocket:', error)
@@ -700,33 +711,41 @@ export const useOrdersStore = defineStore('orders', () => {
    */
   const updateOrderFromWebSocket = (wsOrder) => {
     try {
+      console.log('🔵 updateOrderFromWebSocket вызван с данными:', wsOrder)
+
       const orderId = wsOrder.order_id || wsOrder.id
       const existingIndex = orders.value.findIndex((order) => order.id === orderId)
 
       if (existingIndex !== -1) {
         // Обновляем существующий заказ
         const existingOrder = orders.value[existingIndex]
+        const newStatus = mapServerStatus(wsOrder.status) || existingOrder.status
+
         const updatedOrder = {
           ...existingOrder,
-          status: wsOrder.status || existingOrder.status,
+          status: newStatus,
           totalPrice: wsOrder.total || existingOrder.totalPrice,
           items: wsOrder.items || existingOrder.items,
           itemsText: wsOrder.items
             ? wsOrder.items
-                .map((item) => `${item.quantity || 1}x ${item.name || item.title || 'Неизвестно'}`)
+                .map(
+                  (item) =>
+                    `${item.quantity || item.qty || 1}x ${item.name || item.title || 'Неизвестно'}`,
+                )
                 .join(', ')
             : existingOrder.itemsText,
           totalQuantity: wsOrder.items
-            ? wsOrder.items.reduce((sum, item) => sum + (item.quantity || 1), 0)
+            ? wsOrder.items.reduce((sum, item) => sum + (item.quantity || item.qty || 1), 0)
             : existingOrder.totalQuantity,
+          cartItems: wsOrder.items || existingOrder.cartItems,
           serverData: { ...existingOrder.serverData, ...wsOrder },
         }
 
         orders.value[existingIndex] = updatedOrder
-        console.log('📋 Заказ обновлен через WebSocket:', formatOrderNumber(orderId))
+        console.log('✅ Заказ обновлен через WebSocket:', formatOrderNumber(orderId))
 
         // Показываем уведомление об изменении статуса
-        if (wsOrder.status && wsOrder.status !== existingOrder.status) {
+        if (newStatus !== existingOrder.status) {
           const statusTexts = {
             pending: 'в обработке',
             preparing: 'готовится',
@@ -738,12 +757,12 @@ export const useOrdersStore = defineStore('orders', () => {
           mainStore.addNotification({
             type: 'info',
             title: 'Статус заказа изменен',
-            message: `Заказ ${formatOrderNumber(orderId)} теперь: ${statusTexts[wsOrder.status] || wsOrder.status}`,
+            message: `Заказ ${formatOrderNumber(orderId)} теперь: ${statusTexts[newStatus] || newStatus}`,
             duration: 3000,
           })
         }
       } else {
-        console.log('📋 Заказ для обновления не найден, добавляем как новый:', orderId)
+        console.log('⚠️ Заказ для обновления не найден, добавляем как новый:', orderId)
         // Если заказ не найден, добавляем его как новый
         addOrderFromWebSocket(wsOrder)
       }

@@ -72,6 +72,11 @@
       <template v-if="activeTab === 'settings'">
         <SettingsManagement @save-settings="handleSaveSettings" />
       </template>
+
+      <!-- Вкладка уведомлений -->
+      <template v-if="activeTab === 'notifications'">
+        <NotificationsManagement />
+      </template>
     </div>
   </div>
 
@@ -101,6 +106,7 @@ import {
   MenuManagement,
   DeviceManagement,
   SettingsManagement,
+  NotificationsManagement,
 } from '@/components/OrdersPage'
 import WebSocketStatus from '@/components/common/WebSocketStatus.vue'
 
@@ -576,13 +582,45 @@ onMounted(async () => {
   console.log('🔌 Инициализация WebSocket соединения...')
   webSocketStore.connect()
 
-  // Подключаемся к WebSocket для уведомлений о вызове официанта
-  console.log('🔌 Инициализация WebSocket официанта...')
-  webSocketStore.connectWaiterSocket()
+  // Подключаемся к WebSocket для новых уведомлений
+  console.log('🔌 Инициализация WebSocket уведомлений...')
+  webSocketStore.connectNotificationsSocket()
+
+  // Подключаемся к WebSocket для всех уведомлений (для вкладки)
+  console.log('🔌 Инициализация WebSocket всех уведомлений...')
+  webSocketStore.connectAllNotificationsSocket()
 
   // Подключаемся к WebSocket для статуса устройств
   console.log('🔌 Инициализация WebSocket статуса устройств...')
   webSocketStore.connectDeviceStatusSocket()
+
+  // Подключаемся к WebSocket для изображений
+  console.log('🔌 Инициализация WebSocket изображений...')
+  webSocketStore.connectImagesSocket()
+
+  // Подключаемся к WebSocket для меню
+  console.log('🔌 Инициализация WebSocket меню...')
+  webSocketStore.connectMenuSocket()
+
+  // Запускаем периодическое обновление заказов (fallback если WebSocket не работает)
+  let pollingInterval = null
+  const startOrdersPolling = () => {
+    // Проверяем каждые 5 секунд
+    pollingInterval = setInterval(() => {
+      if (!webSocketStore.isConnected) {
+        console.log('🔄 WebSocket не подключен, обновляем заказы через API')
+        ordersStore.fetchOrders()
+      }
+    }, 5000)
+  }
+
+  // Запускаем polling через 3 секунды после загрузки
+  setTimeout(() => {
+    if (!webSocketStore.isConnected) {
+      console.log('⚠️ WebSocket /ws/orders не подключился, запускаем polling')
+      startOrdersPolling()
+    }
+  }, 3000)
 
   // Проверяем, есть ли неразрешенные уведомления при загрузке
   const activeNotifications = notifications.value.filter((n) => !n.resolved)
@@ -595,12 +633,22 @@ onMounted(async () => {
   // Очистка ресурсов при размонтировании
   onUnmounted(() => {
     clearInterval(notificationInterval)
+    if (pollingInterval) {
+      clearInterval(pollingInterval)
+      console.log('⏹️ Остановлен polling заказов')
+    }
     console.log('🔌 Отключение WebSocket соединения...')
     webSocketStore.disconnect()
-    console.log('🔌 Отключение WebSocket официанта...')
-    webSocketStore.disconnectWaiterSocket()
+    console.log('🔌 Отключение WebSocket уведомлений...')
+    webSocketStore.disconnectNotificationsSocket()
+    console.log('🔌 Отключение WebSocket всех уведомлений...')
+    webSocketStore.disconnectAllNotificationsSocket()
     console.log('🔌 Отключение WebSocket статуса устройств...')
     webSocketStore.disconnectDeviceStatusSocket()
+    console.log('🔌 Отключение WebSocket изображений...')
+    webSocketStore.disconnectImagesSocket()
+    console.log('🔌 Отключение WebSocket меню...')
+    webSocketStore.disconnectMenuSocket()
   })
 })
 </script>

@@ -6,6 +6,7 @@
         <button class="btn-refresh" @click="loadDevices" :disabled="deviceStore.devicesLoading">
           🔄 Обновить список
         </button>
+        <button class="btn-qr" @click="showQrModal = true">🔲 Сгенерировать QR</button>
         <button class="btn-add" @click="showRegisterModal = true">
           ➕ Зарегистрировать планшет
         </button>
@@ -72,6 +73,7 @@
           <button class="btn-assign" @click="openAssignModal(device)">
             {{ device.short_id ? '✏️ Изменить стол' : '📍 Назначить стол' }}
           </button>
+          <button class="btn-control" @click="openControlModal(device)">⚙️ Управление</button>
           <button class="btn-delete" @click="confirmDeleteDevice(device)">🗑️ Удалить</button>
         </div>
       </div>
@@ -210,6 +212,219 @@
         </div>
       </div>
     </div>
+
+    <!-- Модальное окно генерации QR кода -->
+    <div v-if="showQrModal" class="modal-overlay" @click="closeQrModal">
+      <div class="modal-content qr-modal" @click.stop>
+        <div class="modal-header">
+          <h3>🔲 Генерация QR кода для настройки Android</h3>
+          <button class="close-btn" @click="closeQrModal">✕</button>
+        </div>
+
+        <div class="modal-body">
+          <div class="qr-info">
+            <p class="info-text">
+              <strong>ℹ️ Важная информация:</strong>
+            </p>
+            <ul class="info-list">
+              <li>✅ Приложение получит права Device Owner (владелец устройства)</li>
+              <li>
+                ⚠️ Работает только на новых устройствах или после Factory Reset (до первой
+                настройки)
+              </li>
+              <li>
+                📱 QR код автоматически настроит WiFi, установит приложение и подключит к серверу
+              </li>
+            </ul>
+          </div>
+
+          <div class="form-group">
+            <label for="wifiSsid">WiFi SSID (необязательно)</label>
+            <input
+              id="wifiSsid"
+              v-model="qrConfig.wifi_ssid"
+              type="text"
+              class="form-input"
+              placeholder="Restaurant_WiFi"
+            />
+            <small>Если не указан, используются настройки из БД</small>
+          </div>
+
+          <div class="form-group">
+            <label for="wifiPassword">WiFi пароль (необязательно)</label>
+            <input
+              id="wifiPassword"
+              v-model="qrConfig.wifi_password"
+              type="text"
+              class="form-input"
+              placeholder="SecurePass123"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="wifiSecurity">Тип безопасности WiFi</label>
+            <select id="wifiSecurity" v-model="qrConfig.wifi_security" class="form-input">
+              <option value="WPA">WPA/WPA2</option>
+              <option value="WEP">WEP</option>
+              <option value="NONE">Без пароля</option>
+            </select>
+          </div>
+
+          <!-- QR код результат -->
+          <div v-if="generatedQr" class="qr-result">
+            <h4>✅ QR код успешно сгенерирован!</h4>
+            <div class="qr-image-container">
+              <img :src="generatedQr.qr_base64" alt="QR код для настройки устройства" />
+            </div>
+            <p class="qr-instruction">Отсканируйте этот QR код на новом Android устройстве</p>
+            <button class="btn-download" @click="downloadQr">💾 Скачать QR код</button>
+          </div>
+
+          <div v-if="qrError" class="error-message">{{ qrError }}</div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn-cancel" @click="closeQrModal">Закрыть</button>
+          <button
+            v-if="!generatedQr"
+            class="btn-generate"
+            @click="generateQrCode"
+            :disabled="isGeneratingQr"
+          >
+            {{ isGeneratingQr ? 'Генерация...' : '🔲 Сгенерировать QR' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Модальное окно управления устройством -->
+    <div v-if="showControlModal" class="modal-overlay" @click="closeControlModal">
+      <div class="modal-content control-modal" @click.stop>
+        <div class="modal-header">
+          <h3>⚙️ Управление устройством</h3>
+          <button class="close-btn" @click="closeControlModal">✕</button>
+        </div>
+
+        <div class="modal-body">
+          <div class="control-device-info">
+            <p class="device-name">{{ selectedDevice?.model || 'Unknown Device' }}</p>
+            <p class="android-id-small">{{ selectedDevice?.android_id }}</p>
+          </div>
+
+          <!-- Блок команд блокировки -->
+          <div class="control-section">
+            <h4>🔒 Режим киоска</h4>
+            <div class="control-buttons">
+              <button
+                class="btn-control-action btn-lock"
+                @click="sendCommand('lock')"
+                :disabled="isExecutingCommand"
+              >
+                🔒 Заблокировать
+              </button>
+              <button
+                class="btn-control-action btn-unlock"
+                @click="sendCommand('unlock')"
+                :disabled="isExecutingCommand"
+              >
+                🔓 Разблокировать
+              </button>
+            </div>
+            <p class="control-hint">Включение/выключение режима киоска на устройстве</p>
+          </div>
+
+          <!-- Блок системных команд -->
+          <div class="control-section">
+            <h4>🔄 Системные команды</h4>
+            <div class="control-buttons">
+              <button
+                class="btn-control-action btn-reboot"
+                @click="sendCommand('reboot')"
+                :disabled="isExecutingCommand"
+              >
+                🔄 Перезагрузить
+              </button>
+              <button
+                class="btn-control-action btn-shutdown"
+                @click="sendCommand('shutdown')"
+                :disabled="isExecutingCommand"
+              >
+                ⚡ Выключить
+              </button>
+            </div>
+            <p class="control-hint">Перезагрузка или выключение устройства</p>
+          </div>
+
+          <!-- Блок обновления -->
+          <div class="control-section">
+            <h4>📦 Обновление приложения</h4>
+            <div class="form-group">
+              <label for="apkUrl">URL APK файла</label>
+              <input
+                id="apkUrl"
+                v-model="updateConfig.apk_url"
+                type="text"
+                class="form-input"
+                placeholder="http://example.com/app.apk"
+              />
+            </div>
+            <div class="form-group">
+              <label for="checksum">Checksum (необязательно)</label>
+              <input
+                id="checksum"
+                v-model="updateConfig.checksum"
+                type="text"
+                class="form-input"
+                placeholder="SHA256 checksum"
+              />
+            </div>
+            <button
+              class="btn-control-action btn-update"
+              @click="sendUpdateCommand"
+              :disabled="!updateConfig.apk_url || isExecutingCommand"
+            >
+              📦 Обновить приложение
+            </button>
+            <p class="control-hint">Установка новой версии APK на устройство</p>
+          </div>
+
+          <!-- История команд -->
+          <div class="control-section">
+            <h4>📋 История команд</h4>
+            <button
+              class="btn-control-action btn-history"
+              @click="loadCommandHistory"
+              :disabled="isLoadingHistory"
+            >
+              {{ isLoadingHistory ? 'Загрузка...' : '📋 Показать историю' }}
+            </button>
+
+            <div v-if="commandHistory.length > 0" class="command-history">
+              <div v-for="cmd in commandHistory" :key="cmd.id" class="history-item">
+                <div class="history-header">
+                  <span class="history-command"
+                    >{{ getCommandIcon(cmd.command) }} {{ cmd.command }}</span
+                  >
+                  <span :class="['history-status', cmd.executed ? 'executed' : 'pending']">
+                    {{ cmd.executed ? '✅ Выполнено' : '⏳ Ожидание' }}
+                  </span>
+                </div>
+                <div class="history-meta">
+                  <span class="history-date">{{ formatDate(cmd.created_at) }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="controlError" class="error-message">{{ controlError }}</div>
+          <div v-if="controlSuccess" class="success-message">{{ controlSuccess }}</div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn-cancel" @click="closeControlModal">Закрыть</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -222,12 +437,33 @@ const deviceStore = useDeviceStore()
 // State
 const showRegisterModal = ref(false)
 const showAssignModal = ref(false)
+const showQrModal = ref(false)
+const showControlModal = ref(false)
 const isRegistering = ref(false)
 const isAssigning = ref(false)
+const isGeneratingQr = ref(false)
+const isExecutingCommand = ref(false)
+const isLoadingHistory = ref(false)
 const registerError = ref('')
 const assignError = ref('')
+const qrError = ref('')
+const controlError = ref('')
+const controlSuccess = ref('')
 const selectedDevice = ref(null)
 const assignShortId = ref('')
+const generatedQr = ref(null)
+const commandHistory = ref([])
+
+const updateConfig = ref({
+  apk_url: '',
+  checksum: '',
+})
+
+const qrConfig = ref({
+  wifi_ssid: '',
+  wifi_password: '',
+  wifi_security: 'WPA',
+})
 
 const newDevice = ref({
   android_id: '',
@@ -414,6 +650,285 @@ const closeAssignModal = () => {
   assignError.value = ''
 }
 
+const generateQrCode = async () => {
+  qrError.value = ''
+  isGeneratingQr.value = true
+
+  try {
+    console.log('🔲 Генерируем QR код с параметрами:', qrConfig.value)
+
+    // Формируем тело запроса (только заполненные поля)
+    const requestBody = {}
+
+    if (qrConfig.value.wifi_ssid) {
+      requestBody.wifi_ssid = qrConfig.value.wifi_ssid
+    }
+    if (qrConfig.value.wifi_password) {
+      requestBody.wifi_password = qrConfig.value.wifi_password
+    }
+    if (qrConfig.value.wifi_security) {
+      requestBody.wifi_security = qrConfig.value.wifi_security
+    }
+
+    const response = await fetch('http://83.222.9.90:8080/api/devices/generate_qr', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    })
+
+    if (response.ok) {
+      const data = await response.json()
+      console.log('✅ QR код сгенерирован:', data)
+      generatedQr.value = data
+    } else {
+      const errorData = await response.json()
+      qrError.value = errorData.error || 'Ошибка генерации QR кода'
+      console.error('❌ Ошибка генерации QR:', errorData)
+    }
+  } catch (error) {
+    qrError.value = error.message || 'Ошибка сети при генерации QR кода'
+    console.error('❌ Критическая ошибка генерации QR:', error)
+  } finally {
+    isGeneratingQr.value = false
+  }
+}
+
+const downloadQr = () => {
+  if (!generatedQr.value?.qr_base64) return
+
+  // Создаем ссылку для скачивания
+  const link = document.createElement('a')
+  link.href = generatedQr.value.qr_base64
+  link.download = `android-provisioning-qr-${Date.now()}.png`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+
+  console.log('💾 QR код скачан')
+}
+
+const closeQrModal = () => {
+  showQrModal.value = false
+  generatedQr.value = null
+  qrError.value = ''
+  qrConfig.value = {
+    wifi_ssid: '',
+    wifi_password: '',
+    wifi_security: 'WPA',
+  }
+}
+
+const openControlModal = (device) => {
+  selectedDevice.value = device
+  controlError.value = ''
+  controlSuccess.value = ''
+  commandHistory.value = []
+  showControlModal.value = true
+}
+
+const closeControlModal = () => {
+  showControlModal.value = false
+  selectedDevice.value = null
+  controlError.value = ''
+  controlSuccess.value = ''
+  commandHistory.value = []
+  updateConfig.value = {
+    apk_url: '',
+    checksum: '',
+  }
+}
+
+const sendCommand = async (command) => {
+  if (!selectedDevice.value) return
+
+  controlError.value = ''
+  controlSuccess.value = ''
+  isExecutingCommand.value = true
+
+  try {
+    const android_id = selectedDevice.value.android_id
+    console.log(`🔧 Отправка команды ${command} устройству ${android_id}`)
+
+    // TODO: Раскомментировать после тестирования API
+    /*
+    const response = await fetch(`http://83.222.9.90:8080/api/device/${android_id}/${command}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+
+    if (response.ok) {
+      const data = await response.json()
+      console.log('✅ Команда отправлена:', data)
+      controlSuccess.value = `Команда "${command}" успешно отправлена устройству`
+      
+      // Автоматически загружаем историю после успешной команды
+      setTimeout(() => loadCommandHistory(), 500)
+    } else {
+      const errorData = await response.json()
+      controlError.value = errorData.error || `Ошибка отправки команды ${command}`
+      console.error('❌ Ошибка команды:', errorData)
+    }
+    */
+
+    // Временная заглушка для тестирования UI
+    await new Promise((resolve) => setTimeout(resolve, 500))
+    controlSuccess.value = `Команда "${command}" успешно отправлена устройству (тестовый режим)`
+    console.log('⚠️ API не вызван - тестовый режим')
+  } catch (error) {
+    controlError.value = error.message || 'Ошибка сети при отправке команды'
+    console.error('❌ Критическая ошибка отправки команды:', error)
+  } finally {
+    isExecutingCommand.value = false
+  }
+}
+
+const sendUpdateCommand = async () => {
+  if (!selectedDevice.value || !updateConfig.value.apk_url) return
+
+  controlError.value = ''
+  controlSuccess.value = ''
+  isExecutingCommand.value = true
+
+  try {
+    const android_id = selectedDevice.value.android_id
+    console.log(`📦 Отправка команды обновления устройству ${android_id}`)
+
+    const requestBody = {
+      apk_url: updateConfig.value.apk_url,
+    }
+
+    if (updateConfig.value.checksum) {
+      requestBody.checksum = updateConfig.value.checksum
+    }
+
+    // TODO: Раскомментировать после тестирования API
+    /*
+    const response = await fetch(`http://83.222.9.90:8080/api/device/${android_id}/update`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    })
+
+    if (response.ok) {
+      const data = await response.json()
+      console.log('✅ Команда обновления отправлена:', data)
+      controlSuccess.value = 'Команда обновления успешно отправлена устройству'
+      
+      // Очищаем поля после успешной отправки
+      updateConfig.value = {
+        apk_url: '',
+        checksum: '',
+      }
+      
+      // Загружаем историю
+      setTimeout(() => loadCommandHistory(), 500)
+    } else {
+      const errorData = await response.json()
+      controlError.value = errorData.error || 'Ошибка отправки команды обновления'
+      console.error('❌ Ошибка команды обновления:', errorData)
+    }
+    */
+
+    // Временная заглушка для тестирования UI
+    await new Promise((resolve) => setTimeout(resolve, 500))
+    controlSuccess.value = 'Команда обновления успешно отправлена устройству (тестовый режим)'
+    console.log('⚠️ API не вызван - тестовый режим')
+
+    // Очищаем поля после успешной отправки
+    updateConfig.value = {
+      apk_url: '',
+      checksum: '',
+    }
+  } catch (error) {
+    controlError.value = error.message || 'Ошибка сети при отправке команды обновления'
+    console.error('❌ Критическая ошибка отправки команды обновления:', error)
+  } finally {
+    isExecutingCommand.value = false
+  }
+}
+
+const loadCommandHistory = async () => {
+  if (!selectedDevice.value) return
+
+  controlError.value = ''
+  isLoadingHistory.value = true
+
+  try {
+    const android_id = selectedDevice.value.android_id
+    console.log(`📋 Загрузка истории команд для ${android_id}`)
+
+    // TODO: Раскомментировать после тестирования API
+    /*
+    const response = await fetch(`http://83.222.9.90:8080/api/device/${android_id}/commands`)
+
+    if (response.ok) {
+      const data = await response.json()
+      console.log('✅ История команд загружена:', data)
+      commandHistory.value = data.commands || []
+    } else {
+      const errorData = await response.json()
+      controlError.value = errorData.error || 'Ошибка загрузки истории команд'
+      console.error('❌ Ошибка загрузки истории:', errorData)
+    }
+    */
+
+    // Временная заглушка для тестирования UI
+    await new Promise((resolve) => setTimeout(resolve, 500))
+    commandHistory.value = [
+      {
+        id: 1,
+        device_id: android_id,
+        command: 'lock',
+        payload: null,
+        executed: true,
+        created_at: new Date(Date.now() - 3600000).toISOString(),
+        updated_at: new Date(Date.now() - 3500000).toISOString(),
+      },
+      {
+        id: 2,
+        device_id: android_id,
+        command: 'update',
+        payload: '{"apk_url":"http://example.com/app.apk"}',
+        executed: false,
+        created_at: new Date(Date.now() - 1800000).toISOString(),
+        updated_at: new Date(Date.now() - 1800000).toISOString(),
+      },
+      {
+        id: 3,
+        device_id: android_id,
+        command: 'reboot',
+        payload: null,
+        executed: true,
+        created_at: new Date(Date.now() - 600000).toISOString(),
+        updated_at: new Date(Date.now() - 500000).toISOString(),
+      },
+    ]
+    console.log('⚠️ API не вызван - тестовый режим, показаны примеры команд')
+  } catch (error) {
+    controlError.value = error.message || 'Ошибка сети при загрузке истории'
+    console.error('❌ Критическая ошибка загрузки истории:', error)
+  } finally {
+    isLoadingHistory.value = false
+  }
+}
+
+const getCommandIcon = (command) => {
+  const icons = {
+    lock: '🔒',
+    unlock: '🔓',
+    reboot: '🔄',
+    shutdown: '⚡',
+    update: '📦',
+  }
+  return icons[command] || '⚙️'
+}
+
 const getDeviceStatus = (device) => {
   // Если есть явное поле is_active
   if (device.is_active !== undefined) {
@@ -501,6 +1016,23 @@ onMounted(() => {
 .btn-refresh:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.btn-qr {
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-qr:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
 }
 
 .btn-add {
@@ -759,6 +1291,7 @@ onMounted(() => {
 }
 
 .btn-assign,
+.btn-control,
 .btn-delete {
   flex: 1;
   padding: 10px 16px;
@@ -777,6 +1310,15 @@ onMounted(() => {
 
 .btn-assign:hover:not(:disabled) {
   background: #2563eb;
+}
+
+.btn-control {
+  background: #8b5cf6;
+  color: white;
+}
+
+.btn-control:hover:not(:disabled) {
+  background: #7c3aed;
 }
 
 .btn-delete {
@@ -808,6 +1350,9 @@ onMounted(() => {
   border-radius: 16px;
   width: 90%;
   max-width: 500px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
   animation: modalAppear 0.3s ease-out;
 }
@@ -854,6 +1399,26 @@ onMounted(() => {
 
 .modal-body {
   padding: 25px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.modal-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.modal-body::-webkit-scrollbar-track {
+  background: #f3f4f6;
+  border-radius: 4px;
+}
+
+.modal-body::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 4px;
+}
+
+.modal-body::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
 }
 
 .device-name {
@@ -921,6 +1486,7 @@ onMounted(() => {
   background: #f9fafb;
   border-top: 1px solid #e5e7eb;
   border-radius: 0 0 16px 16px;
+  flex-shrink: 0;
 }
 
 .btn-cancel,
@@ -959,6 +1525,307 @@ onMounted(() => {
 
 .btn-register:disabled,
 .btn-assign-confirm:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* QR модалка */
+.qr-modal {
+  max-width: 600px;
+}
+
+/* Control модалка */
+.control-modal {
+  max-width: 650px;
+}
+
+.control-device-info {
+  background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.control-section {
+  margin-bottom: 28px;
+  padding: 20px;
+  background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+}
+
+.control-section h4 {
+  margin: 0 0 16px 0;
+  color: #1f2937;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.control-buttons {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.btn-control-action {
+  padding: 12px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  color: white;
+}
+
+.btn-control-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+.btn-lock {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+}
+
+.btn-lock:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+.btn-unlock {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+
+.btn-unlock:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.btn-reboot {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+}
+
+.btn-reboot:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+.btn-shutdown {
+  background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+}
+
+.btn-shutdown:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(107, 114, 128, 0.3);
+}
+
+.btn-update {
+  width: 100%;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  margin-top: 12px;
+}
+
+.btn-update:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.btn-history {
+  width: 100%;
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+}
+
+.btn-history:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+}
+
+.control-hint {
+  margin: 0;
+  font-size: 12px;
+  color: #6b7280;
+  font-style: italic;
+}
+
+.command-history {
+  margin-top: 16px;
+  max-height: 300px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.command-history::-webkit-scrollbar {
+  width: 6px;
+}
+
+.command-history::-webkit-scrollbar-track {
+  background: #f3f4f6;
+  border-radius: 3px;
+}
+
+.command-history::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+
+.history-item {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.history-command {
+  font-weight: 600;
+  color: #1f2937;
+  font-size: 14px;
+}
+
+.history-status {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.history-status.executed {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.history-status.pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.history-meta {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.success-message {
+  padding: 12px;
+  background: #d1fae5;
+  border: 1px solid #a7f3d0;
+  border-radius: 8px;
+  color: #065f46;
+  font-size: 14px;
+  margin-top: 15px;
+}
+
+.qr-info {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border: 2px solid #bfdbfe;
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.info-text {
+  margin: 0 0 10px 0;
+  color: #1e40af;
+  font-size: 14px;
+}
+
+.info-list {
+  margin: 0;
+  padding-left: 20px;
+  color: #1e3a8a;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.info-list li {
+  margin-bottom: 6px;
+}
+
+.qr-result {
+  margin-top: 24px;
+  padding: 20px;
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  border: 2px solid #bbf7d0;
+  border-radius: 12px;
+  text-align: center;
+}
+
+.qr-result h4 {
+  margin: 0 0 16px 0;
+  color: #166534;
+  font-size: 16px;
+}
+
+.qr-image-container {
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+  display: inline-block;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  margin-bottom: 16px;
+}
+
+.qr-image-container img {
+  display: block;
+  max-width: 300px;
+  width: 100%;
+  height: auto;
+}
+
+.qr-instruction {
+  margin: 0 0 16px 0;
+  color: #166534;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.btn-download {
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-download:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.btn-generate {
+  flex: 1;
+  padding: 12px 20px;
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-generate:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+}
+
+.btn-generate:disabled {
   background: #9ca3af;
   cursor: not-allowed;
   transform: none;

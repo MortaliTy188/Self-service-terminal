@@ -3,13 +3,14 @@
     <div v-if="isLoading" class="loading">Загрузка меню...</div>
     <div v-else-if="error" class="error">Ошибка: {{ error }}</div>
     <div v-else-if="filteredItems.length === 0" class="empty">Нет блюд в данной категории</div>
-    <FoodCard
-      v-else
-      v-for="item in filteredItems"
-      :key="item.id"
-      :item="item"
-      @show-detail="$emit('show-detail', $event)"
-    />
+    <TransitionGroup v-else name="food-card" tag="div" class="food-grid">
+      <FoodCard
+        v-for="item in filteredItems"
+        :key="item.id"
+        :item="item"
+        @show-detail="$emit('show-detail', $event)"
+      />
+    </TransitionGroup>
   </div>
 </template>
 
@@ -36,11 +37,11 @@ const error = computed(() => menuStore.error)
 // Вычисляем отфильтрованные элементы на основе выбранной категории
 const filteredItems = computed(() => {
   if (!props.selectedCategory) {
-    // Если категория не выбрана, показываем все активные блюда
-    return menu.value.filter((item) => item.is_active !== false)
+    // Показываем все блюда, включая неактивные (они будут визуально отличаться)
+    return menu.value
   }
-  // Фильтруем блюда по выбранной категории, только активные
-  return menuStore.getActiveMenuByCategory(props.selectedCategory)
+  // Фильтруем блюда по выбранной категории (все, включая неактивные)
+  return menu.value.filter((item) => item.category_id === props.selectedCategory)
 })
 </script>
 
@@ -58,6 +59,35 @@ const filteredItems = computed(() => {
   flex-wrap: wrap;
   overflow: auto;
   max-height: 100%;
+}
+
+.food-grid {
+  display: flex;
+  justify-content: flex-start;
+  align-content: flex-start;
+  gap: 15px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+/* Transition анимации для карточек */
+.food-card-enter-active,
+.food-card-leave-active {
+  transition: all 0.5s ease;
+}
+
+.food-card-enter-from {
+  opacity: 0;
+  transform: scale(0.8) translateY(20px);
+}
+
+.food-card-leave-to {
+  opacity: 0;
+  transform: scale(0.8) translateY(-20px);
+}
+
+.food-card-move {
+  transition: transform 0.5s ease;
 }
 
 .loading,

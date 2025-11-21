@@ -1,5 +1,12 @@
 <template>
-  <div class="food-card" @click="$emit('show-detail', item)">
+  <div
+    class="food-card"
+    :class="{ 'food-card--unavailable': !item.is_active }"
+    @click="handleClick"
+  >
+    <div v-if="!item.is_active" class="unavailable-overlay">
+      <div class="unavailable-badge">Нет в наличии</div>
+    </div>
     <img
       :src="item.image || placeholderImage"
       :alt="item.name || item.title"
@@ -13,17 +20,25 @@
 <script setup>
 import placeholderImage from '@/assets/image 28.png'
 
-defineProps({
+const props = defineProps({
   item: {
     type: Object,
     required: true,
   },
 })
 
-defineEmits(['show-detail'])
+const emit = defineEmits(['show-detail'])
 
 const handleImageError = (event) => {
   event.target.src = placeholderImage
+}
+
+const handleClick = () => {
+  // Если блюдо неактивно, не открываем детали
+  if (!props.item.is_active) {
+    return
+  }
+  emit('show-detail', props.item)
 }
 </script>
 
@@ -46,6 +61,53 @@ const handleImageError = (event) => {
   border: 2px solid #f0f0f0;
   position: relative;
   overflow: hidden;
+}
+
+/* Стили для недоступных блюд */
+.food-card--unavailable {
+  opacity: 0.6;
+  cursor: not-allowed;
+  filter: grayscale(70%);
+}
+
+.food-card--unavailable:hover {
+  transform: none;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  background: white;
+}
+
+.unavailable-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.unavailable-badge {
+  background: #f44336;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(244, 67, 54, 0.4);
+  transform: rotate(-5deg);
 }
 
 @media screen and (max-width: 1280px) {
