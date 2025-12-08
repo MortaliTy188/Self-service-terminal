@@ -50,6 +50,25 @@ defineEmits(['addQuantity', 'removeQuantity', 'removeFromCart', 'makeOrder'])
   border: 1px solid #333;
 }
 
+@media (max-width: 1115px) {
+  .main-container-right {
+    padding: 18px 14px;
+    flex-basis: 320px;
+    max-width: 340px;
+  }
+
+  .cart-title {
+    font-size: 26px;
+  }
+
+  .button {
+    font-size: 20px;
+    height: 58px;
+    max-width: 240px;
+    padding: 14px 16px;
+  }
+}
+
 .cart-header {
   display: flex;
   flex-direction: column;

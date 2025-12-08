@@ -53,8 +53,7 @@ const handleClick = () => {
   cursor: pointer;
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   border-radius: 15px;
-  width: calc(28% - 11.25px);
-  min-width: 150px;
+  width: calc(33.33% - 10px);
   flex-shrink: 0;
   align-self: flex-start;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
@@ -113,6 +112,12 @@ const handleClick = () => {
 @media screen and (max-width: 1280px) {
   .food-card {
     width: calc(42% - 10px);
+  }
+}
+
+@media (max-width: 1115px) {
+  .food-card {
+    width: calc(40% - 7.5px);
   }
 }
 
@@ -179,7 +184,7 @@ const handleClick = () => {
 
 @media (max-width: 1024px) {
   .food-card {
-    width: calc(33.33% - 10px);
+    width: calc(50% - 7.5px);
   }
 }
 
@@ -192,7 +197,7 @@ const handleClick = () => {
 
 @media (max-width: 480px) {
   .food-card {
-    width: 100%;
+    width: calc(50% - 7.5px);
     height: 180px;
   }
 }

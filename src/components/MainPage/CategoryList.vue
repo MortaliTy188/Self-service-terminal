@@ -111,4 +111,19 @@ const error = computed(() => menuStore.error)
   box-shadow: 0 8px 25px rgba(76, 175, 80, 0.4);
   border-color: #4caf50;
 }
+
+@media (max-width: 1115px) {
+  .categoriesContainer {
+    width: 220px;
+    min-width: 200px;
+    padding: 14px 12px;
+  }
+
+  .button {
+    font-size: 18px;
+    padding: 14px 18px;
+    height: 60px;
+    min-width: 180px;
+  }
+}
 </style>

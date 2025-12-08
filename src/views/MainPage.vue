@@ -343,6 +343,21 @@ body {
   background: white;
 }
 
+@media screen and (max-width: 1115px) {
+  .main-container {
+    padding: 18px 18px;
+    gap: 18px;
+  }
+
+  .main-container-left {
+    gap: 18px;
+  }
+
+  .main-container-left-top {
+    gap: 18px;
+  }
+}
+
 @media screen and (max-width: 1280px) {
   .main-container {
     padding-bottom: 75px;
@@ -371,5 +386,30 @@ body {
 main {
   background: #f8f9fa;
   min-height: 85vh;
+}
+
+@media screen and (max-width: 800px) {
+  .main-container {
+    flex-direction: column;
+    height: auto;
+    padding: 16px 14px;
+    gap: 16px;
+  }
+
+  .main-container-left {
+    flex: unset;
+    width: 100%;
+    gap: 16px;
+  }
+
+  .main-container-left-top {
+    flex-direction: column;
+    gap: 16px;
+    height: auto;
+  }
+
+  main {
+    min-height: 100vh;
+  }
 }
 </style>
