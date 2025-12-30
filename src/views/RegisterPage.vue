@@ -68,7 +68,7 @@ function onContactAdminClick() {
   justify-content: center;
   align-items: center;
   height: 100vh;
-  background: linear-gradient(120deg, #cf0101 17%, #fdafaf 48%, #de3a3a 100%);
+  background: url('../assets/SignUpForm.png') no-repeat center center / cover;
 }
 
 .inner {
