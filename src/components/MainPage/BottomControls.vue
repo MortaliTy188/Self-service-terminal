@@ -1,12 +1,11 @@
 <template>
-  <div class="main-container-left-bottom">
-    <button class="officiant-button" @click="$emit('callWaiter')">Вызвать официанта</button>
+  <div v-if="false" class="main-container-left-bottom">
     <button class="button" @click="$emit('showOrderDetails')">Детали заказа</button>
   </div>
 </template>
 
 <script setup>
-defineEmits(['callWaiter', 'showOrderDetails'])
+defineEmits(['showOrderDetails'])
 </script>
 
 <style scoped>
@@ -33,7 +32,6 @@ defineEmits(['callWaiter', 'showOrderDetails'])
   padding: 18px 32px;
   border: 1px solid #333;
   flex: 1;
-  max-width: 280px;
   height: 70px;
   cursor: pointer;
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
@@ -62,45 +60,5 @@ defineEmits(['callWaiter', 'showOrderDetails'])
   transform: translateY(-3px) scale(1.02);
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
   border-color: #d0d0d0;
-}
-
-.officiant-button {
-  background: #2196f3;
-  color: white;
-  font-size: 20px;
-  font-weight: 600;
-  border-radius: 15px;
-  padding: 18px 32px;
-  border: 2px solid #2196f3;
-  flex: 1;
-  max-width: 280px;
-  height: 70px;
-  cursor: pointer;
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);
-  position: relative;
-  overflow: hidden;
-}
-
-.officiant-button::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-  transition: left 0.6s;
-}
-
-.officiant-button:hover::before {
-  left: 100%;
-}
-
-.officiant-button:hover {
-  background: #1976d2;
-  transform: translateY(-3px) scale(1.02);
-  box-shadow: 0 8px 25px rgba(33, 150, 243, 0.4);
-  border-color: #1976d2;
 }
 </style>

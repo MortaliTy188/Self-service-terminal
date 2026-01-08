@@ -1,12 +1,13 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import AppHeader from '@/components/AppHeader.vue'
+import officiantIcon from '@/assets/officiant_icon.svg'
 import {
   useWaiterStore,
   useOrdersStore,
   useMenuStore,
   useDeviceStore,
   useWebSocketStore,
+  useSettingsStore,
 } from '@/stores'
 import {
   CategoryList,
@@ -27,6 +28,7 @@ const ordersStore = useOrdersStore()
 const menuStore = useMenuStore()
 const deviceStore = useDeviceStore()
 const webSocketStore = useWebSocketStore()
+const settingsStore = useSettingsStore()
 
 // Local state
 const selectedCategory = ref(null) // null означает "Все категории"
@@ -47,14 +49,25 @@ const isWaiterLoading = computed(() => waiterStore.isLoading)
 // Номер стола из устройства
 const tableNumber = computed(() => {
   if (deviceStore.shortId) {
-    return `Стол ${deviceStore.shortId}`
+    return `Стол #${deviceStore.shortId}`
   }
-  return 'Номер стола'
+  return 'Стол #—'
+})
+
+const language = computed({
+  get: () => settingsStore.systemSettings.language,
+  set: (value) => settingsStore.updateSystemSettings({ language: value }),
 })
 
 // Event handlers
 const selectCategory = (categoryId) => {
   selectedCategory.value = categoryId
+  if (categoryId === '__PROMO__') {
+    // Специальный фильтр "Акции" — не категория
+    menuStore.clearCategoryFilter()
+    return
+  }
+
   if (categoryId) {
     menuStore.setCurrentCategory(categoryId)
   } else {
@@ -255,25 +268,44 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <AppHeader title="Меню" :table-number="tableNumber" />
-  <main>
-    <div class="main-container">
-      <div class="main-container-left">
-        <div class="main-container-left-top">
-          <CategoryList :selected-category="selectedCategory" @select-category="selectCategory" />
-          <FoodGrid :selected-category="selectedCategory" @show-detail="showFoodDetail" />
-        </div>
-        <BottomControls @call-waiter="callWaiter" @show-order-details="showOrderDetails" />
+  <div class="main-page">
+    <header class="main-page__header">
+      <div class="main-page__table-number">{{ tableNumber }}</div>
+      <div class="main-page__header-right">
+        <button class="main-page__waiter-button" type="button" @click="callWaiter">
+          <img class="main-page__waiter-icon" :src="officiantIcon" alt="" aria-hidden="true" />
+          Вызвать официанта
+        </button>
+        <select v-model="language" class="main-page__language-select" aria-label="Выбор языка">
+          <option value="ru">🇷🇺 RU</option>
+          <option value="en">🇬🇧 EN</option>
+        </select>
       </div>
-      <ShoppingCart
-        :cart-items="cartItems"
-        @add-quantity="addQuantity"
-        @remove-quantity="removeQuantity"
-        @remove-from-cart="removeFromCart"
-        @make-order="makeOrder"
-      />
-    </div>
-  </main>
+    </header>
+
+    <main>
+      <div class="main-container">
+        <section class="menu-container">
+          <div class="menu-container__categories">
+            <CategoryList :selected-category="selectedCategory" @select-category="selectCategory" />
+          </div>
+          <div class="menu-container__foods">
+            <FoodGrid :selected-category="selectedCategory" @show-detail="showFoodDetail" />
+          </div>
+
+          <!-- временно скрыто, но оставлено для логики (детали заказа) -->
+          <BottomControls @show-order-details="showOrderDetails" />
+        </section>
+        <ShoppingCart
+          :cart-items="cartItems"
+          @add-quantity="addQuantity"
+          @remove-quantity="removeQuantity"
+          @remove-from-cart="removeFromCart"
+          @make-order="makeOrder"
+        />
+      </div>
+    </main>
+  </div>
 
   <WaiterPopup
     :show="showWaiterPopup"
@@ -325,22 +357,100 @@ onUnmounted(() => {
   box-sizing: border-box;
 }
 
-html,
-body {
-  margin: 0;
-  padding: 0;
-  overflow-x: hidden;
-  background: #f8f9fa;
+.main-page {
+  background: #f5f4f2;
+  padding-left: 20px;
+  padding-right: 20px;
+  padding-bottom: 20px;
   min-height: 100vh;
+}
+
+.main-page__header {
+  background: #ffffff;
+  border-bottom-left-radius: 20px;
+  border-bottom-right-radius: 20px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.main-page__table-number {
+  font-size: 42px;
+  line-height: 120%;
+  font-weight: bold;
+  color: #151515;
+}
+
+.main-page__header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.main-page__waiter-button {
+  width: 278px;
+  height: 45px;
+  padding: 10px 20px;
+  background: #f5f4f2;
+  border: none;
+  border-radius: 10px;
+  color: #151515;
+  font-size: 19px;
+  line-height: 120%;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.main-page__waiter-icon {
+  width: 20px;
+  height: 20px;
+  flex: none;
+}
+
+.main-page__language-select {
+  height: 45px;
+  width: 80px;
+  padding: 10px 12px;
+  background: #f5f4f2;
+  border: none;
+  border-radius: 12px;
+  color: #151515;
+  font-size: 16px;
 }
 
 .main-container {
   display: flex;
-  padding: 25px 30px;
+  padding: 0;
   height: 85vh;
   overflow: hidden;
   gap: 25px;
-  background: white;
+}
+
+.menu-container {
+  display: flex;
+  flex-direction: column;
+  flex: 3;
+  min-width: 0;
+  height: 100%;
+  background: #ffffff;
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+.menu-container__categories {
+  flex: none;
+}
+
+.menu-container__foods {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 @media screen and (max-width: 1115px) {
@@ -358,11 +468,11 @@ body {
   }
 }
 
-@media screen and (max-width: 1280px) {
+/* @media screen and (max-width: 1280px) {
   .main-container {
     padding-bottom: 75px;
   }
-}
+} */
 
 .main-container-left {
   display: flex;
@@ -384,7 +494,7 @@ body {
 }
 
 main {
-  background: #f8f9fa;
+  background: transparent;
   min-height: 85vh;
 }
 

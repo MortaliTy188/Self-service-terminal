@@ -1,29 +1,34 @@
 <template>
   <div class="main-container-right">
-    <div class="cart-header">
-      <div class="cart-title">Корзина</div>
-      <div v-if="cartItems.length === 0" class="cart-empty">Ваша корзина пуста</div>
+    <div class="cart-title">Ваш заказ</div>
+
+    <div class="cart-content">
+      <div v-if="cartItems.length === 0" class="cart-empty">Ваш заказ пуст</div>
       <div v-else class="cart-items">
-        <CartItem
-          v-for="(item, index) in cartItems"
-          :key="index"
-          :item="item"
-          @add-quantity="$emit('addQuantity', item)"
-          @remove-quantity="$emit('removeQuantity', index)"
-          @remove-from-cart="$emit('removeFromCart', index)"
-        />
+        <div v-for="(item, index) in cartItems" :key="index" class="cart-item-row">
+          <CartItem
+            :item="item"
+            @add-quantity="$emit('addQuantity', item)"
+            @remove-quantity="$emit('removeQuantity', index)"
+          />
+        </div>
       </div>
     </div>
-    <button class="button" v-show="cartItems.length > 0" @click="$emit('makeOrder')">
-      Сделать заказ
-    </button>
+
+    <div class="cart-footer" v-show="cartItems.length > 0">
+      <div class="cart-total">Итого: {{ totalPrice }} ₽</div>
+      <button class="checkout-button" type="button" @click="$emit('makeOrder')">
+        Оформить заказ
+      </button>
+    </div>
   </div>
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import CartItem from './CartItem.vue'
 
-defineProps({
+const props = defineProps({
   cartItems: {
     type: Array,
     required: true,
@@ -31,23 +36,29 @@ defineProps({
 })
 
 defineEmits(['addQuantity', 'removeQuantity', 'removeFromCart', 'makeOrder'])
+
+const totalPrice = computed(() => {
+  return props.cartItems.reduce(
+    (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0),
+    0,
+  )
+})
 </script>
 
 <style scoped>
 .main-container-right {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: space-between;
+  align-items: stretch;
+  justify-content: flex-start;
   height: 100%;
   flex: 1;
   padding: 25px 20px;
   background: white;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: hidden;
   max-width: 100%;
   border-radius: 20px;
-  border: 1px solid #333;
+  border: none;
 }
 
 @media (max-width: 1115px) {
@@ -82,16 +93,24 @@ defineEmits(['addQuantity', 'removeQuantity', 'removeFromCart', 'makeOrder'])
 
 .cart-title {
   font-size: 32px;
-  font-weight: bold;
-  margin-bottom: 25px;
-  color: #333;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: #151515;
+  text-align: left;
 }
 
 .cart-empty {
   font-size: 18px;
   color: #666;
   font-style: italic;
-  margin-top: 50px;
+  margin-top: 24px;
+  text-align: left;
+}
+
+.cart-content {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .cart-items {
@@ -99,54 +118,44 @@ defineEmits(['addQuantity', 'removeQuantity', 'removeFromCart', 'makeOrder'])
   max-width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  overflow-y: auto;
   overflow-x: hidden;
-  padding-right: 5px;
-  padding-left: 5px;
-  padding-top: 5px;
 }
 
-.button {
-  background: #4caf50;
-  color: white;
-  font-size: 22px;
+.cart-item-row {
+  padding: 12px 0;
+  border-bottom: 1px solid #8a8a8a;
+}
+
+.cart-item-row:last-child {
+  border-bottom: none;
+}
+
+.cart-footer {
+  flex: none;
+  padding-top: 16px;
+}
+
+.cart-total {
+  font-size: 18px;
   font-weight: 600;
-  border-radius: 15px;
-  padding: 18px 24px;
+  color: #151515;
+  text-align: left;
+  margin-bottom: 12px;
+}
+
+.checkout-button {
+  width: 100%;
+  height: 48px;
+  border-radius: 94px;
+  background: #151515;
+  color: #ffffff;
   border: none;
-  width: 100%;
-  max-width: 280px;
-  height: 65px;
   cursor: pointer;
-  flex-shrink: 0;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
-  position: relative;
-  overflow: hidden;
-}
-
-.button::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-  transition: left 0.6s;
-}
-
-.button:hover::before {
-  left: 100%;
-}
-
-.button:hover {
-  background: #45a049;
-  transform: translateY(-3px) scale(1.02);
-  box-shadow: 0 8px 25px rgba(76, 175, 80, 0.4);
-}
-
-.button:active {
-  transform: translateY(-1px) scale(1.01);
+  font-size: 16px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 </style>

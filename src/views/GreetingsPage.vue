@@ -31,13 +31,6 @@ const backgroundStyle = computed(() => {
   }
 })
 
-// Computed свойство для проверки состояния конфигурации
-const isConfigured = computed(() => {
-  console.log('Проверяем конфигурацию:', apiConfigStore.config)
-  console.log('Полностью настроена:', apiConfigStore.isFullyConfigured)
-  return apiConfigStore.isFullyConfigured
-})
-
 const goToMainPage = async () => {
   console.log('Попытка перехода на главную страницу...')
 
@@ -88,15 +81,6 @@ onUnmounted(() => {
 
 <template>
   <main :style="backgroundStyle">
-    <div class="container">
-      <h1 class="greetings">Добро пожаловать!</h1>
-    </div>
-
-    <!-- Индикатор состояния конфигурации -->
-    <div v-if="!apiConfigStore.isFullyConfigured" class="config-warning">
-      ⚠️ Терминал не настроен. Обратитесь к администратору.
-    </div>
-
     <button
       class="start-button"
       @click="goToMainPage"
@@ -141,29 +125,27 @@ main {
 }
 
 .start-button {
-  width: clamp(200px, 80%, 706px);
-  height: clamp(50px, 10vh, 108px);
-  background: #d9d9d9;
-  border-radius: 25px;
+  width: 424px;
+  height: 121px;
+  padding: 40px 100px;
+  border-radius: 20px;
+  font-size: 36px;
   border: none;
-  color: #1c1c1c;
-  font-size: clamp(1.5rem, 6vw, 4rem);
-  font-weight: bold;
+  color: white;
+  margin: 25px 50px 50px auto;
+  background-color: #151515;
   cursor: pointer;
-  padding: 0.5rem 1rem;
-  margin-bottom: 2rem;
-  transition: all 0.3s ease;
 }
 
 .start-button.disabled {
-  background: #a0a0a0;
+  background: #383838;
   color: #666;
   cursor: not-allowed;
   opacity: 0.6;
 }
 
 .start-button:not(.disabled):hover {
-  background: #c0c0c0;
+  background: #383838;
   transform: translateY(-2px);
 }
 
@@ -206,9 +188,6 @@ main {
     font-size: 5rem;
   }
   .start-button {
-    width: 706px;
-    height: 108px;
-    padding: 9px 216px;
     margin-bottom: 100px;
   }
 }
